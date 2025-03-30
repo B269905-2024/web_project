@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         
         // Set cookie for job_id
-        setcookie('job_id', $jobId, time() + 3600);
+        setcookie('job_id', $jobId, time() + 604800);
         
         // Redirect to results page
         header("Location: results.php?job_id=$jobId");
