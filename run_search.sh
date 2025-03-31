@@ -11,8 +11,8 @@ read -r HOSTNAME DATABASE USERNAME PASSWORD <<< "$DB_CREDENTIALS"
 
 # Get sequence data with error handling
 #SEQUENCES=$(curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id=$(curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=protein&term=$("$QUERY")&retmax=10" | grep -o '<Id>[0-9]*</Id>' | sed 's/<Id>//g; s/<\/Id>/,/g' | tr -d '\n' | sed 's/,$//')&rettype=fasta&retmode=text")
-SEQUENCES=$(curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id=$(curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=protein&term=$(echo "$QUERY" | sed 's/ /+/g')&retmax=2" | grep -o '<Id>[0-9]*</Id>' | sed 's/<Id>//g; s/<\/Id>/,/g' | tr -d '\n' | sed 's/,$//')&rettype=fasta&retmode=text")
-
+#SEQUENCES=$(curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id=$(curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=protein&term=$(echo "$QUERY" | sed 's/ /+/g')&retmax=2" | grep -o '<Id>[0-9]*</Id>' | sed 's/<Id>//g; s/<\/Id>/,/g' | tr -d '\n' | sed 's/,$//')&rettype=fasta&retmode=text")
+SEQUENCES=$(curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&api_key=9dc98a734d9a91f8aeded236c02838155308&id=$(curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=protein&api_key=9dc98a734d9a91f8aeded236c02838155308&term=$(echo "$PROTEIN_FAMILY+AND+$TAXONOMIC_GROUP" | sed 's/ /+/g')&retmax=10" | grep -o '<Id>[0-9]*</Id>' | sed 's/<Id>//g; s/<\/Id>/,/g' | tr -d '\n' | sed 's/,$//')&rettype=fasta&retmode=text")
 
 if [ -z "$SEQUENCES" ]; then
     STATUS="failed"
