@@ -68,91 +68,112 @@ echo "$plotcon_output" | awk '/^[0-9]/ {print $1,$2}' | while read pos score; do
     $MYSQL_CMD "INSERT INTO conservation_results (conservation_id, position, plotcon_score) VALUES ($CONSERVATION_ID, $pos, $score)"
 done
 
-# 4. Run Shannon Entropy analysis using Python
-python3 - <<EOF
-import sys
-import numpy as np
-from Bio import AlignIO
-from collections import Counter
-import MySQLdb
+# 4. Calculate Shannon Entropy using awk (no Python)
+ALIGN_LENGTH=$(head -n 1 $ALIGN_FILE | awk '{print $2}')
+NUM_SEQUENCES=$(grep -c "^CLUSTAL" $ALIGN_FILE)
 
-# Database connection
-db = MySQLdb.connect(host="$DB_HOST", user="$DB_USER", passwd="$DB_PASS", db="$DB_NAME")
-cursor = db.cursor()
+# Create position-by-position counts file
+grep -v "^CLUSTAL" $ALIGN_FILE | grep -v "^$" | grep -v "^\s" | awk '{print $1}' | \
+awk -v len=$ALIGN_LENGTH '
+BEGIN {
+    for (i=1; i<=len; i++) counts[i] = ""
+}
+{
+    seq = $1
+    for (i=1; i<=len; i++) {
+        aa = substr(seq, i, 1)
+        if (aa != "-") {
+            counts[i] = counts[i] aa
+        }
+    }
+}
+END {
+    for (i=1; i<=len; i++) {
+        print i, counts[i]
+    }
+}' > position_counts.tmp
 
-# Read alignment
-alignment = AlignIO.read("$ALIGN_FILE", "clustal")
-num_sequences = len(alignment)
-alignment_length = alignment.get_alignment_length()
+# Calculate entropy for each position and store in database
+while read -r line; do
+    pos=$(echo "$line" | awk '{print $1}')
+    column=$(echo "$line" | awk '{print $2}')
+    
+    if [ -z "$column" ]; then
+        entropy=0
+    else
+        # Count amino acids using awk
+        entropy=$(echo "$column" | \
+        awk '{
+            len = length($0)
+            delete counts
+            for (i=1; i<=len; i++) {
+                aa = substr($0,i,1)
+                counts[aa]++
+            }
+            entropy = 0
+            for (a in counts) {
+                p = counts[a]/len
+                entropy -= p * log(p)/log(2)
+            }
+            print entropy
+        }')
+    fi
+    
+    $MYSQL_CMD "INSERT INTO conservation_results (conservation_id, position, entropy) VALUES ($CONSERVATION_ID, $pos, $entropy) ON DUPLICATE KEY UPDATE entropy = VALUES(entropy)"
+done < position_counts.tmp
 
-# Calculate entropy for each position
-entropy_results = []
-for i in range(alignment_length):
-    column = str(alignment[:, i]).replace('-', '')  # Ignore gaps
-    if column:
-        counts = Counter(column)
-        total = len(column)
-        entropy = -sum((count/total) * np.log2(count/total) for count in counts.values())
-    else:
-        entropy = 0  # All gaps = 0 entropy
+# Store aligned sequences in database
+grep -v "^CLUSTAL" $ALIGN_FILE | grep -v "^$" | grep -v "^\s" | awk '{print $1,$2}' | \
+while read -r ncbi_id sequence; do
+    $MYSQL_CMD "INSERT INTO conservation_alignments (conservation_id, ncbi_id, sequence) VALUES ($CONSERVATION_ID, '$ncbi_id', '$sequence')"
+done
 
-    # Store in database
-    cursor.execute("""
-        INSERT INTO conservation_results (conservation_id, position, entropy)
-        VALUES ($CONSERVATION_ID, %s, %s)
-        ON DUPLICATE KEY UPDATE entropy = VALUES(entropy)
-    """, (i+1, float(entropy)))
-    entropy_results.append(entropy)
+# Calculate statistics using mysql
+STATS=$($MYSQL_CMD "SELECT 
+    AVG(entropy) as mean_entropy,
+    MAX(entropy) as max_entropy,
+    MIN(entropy) as min_entropy,
+    (SELECT position FROM conservation_results WHERE conservation_id = $CONSERVATION_ID AND entropy = (SELECT MAX(entropy) FROM conservation_results WHERE conservation_id = $CONSERVATION_ID) as max_pos,
+    (SELECT position FROM conservation_results WHERE conservation_id = $CONSERVATION_ID AND entropy = (SELECT MIN(entropy) FROM conservation_results WHERE conservation_id = $CONSERVATION_ID) as min_pos
+FROM conservation_results WHERE conservation_id = $CONSERVATION_ID")
 
-# Calculate statistics
-mean_entropy = np.mean(entropy_results)
-max_entropy = np.max(entropy_results)
-min_entropy = np.min(entropy_results)
-max_pos = np.argmax(entropy_results) + 1
-min_pos = np.argmin(entropy_results) + 1
+MEAN_ENTROPY=$(echo "$STATS" | awk '{print $1}')
+MAX_ENTROPY=$(echo "$STATS" | awk '{print $2}')
+MIN_ENTROPY=$(echo "$STATS" | awk '{print $3}')
+MAX_POS=$(echo "$STATS" | awk '{print $4}')
+MIN_POS=$(echo "$STATS" | awk '{print $5}')
 
-# Store alignments in database
-for record in alignment:
-    cursor.execute("""
-        INSERT INTO conservation_alignments (conservation_id, ncbi_id, sequence)
-        VALUES ($CONSERVATION_ID, %s, %s)
-    """, (record.id, str(record.seq)))
+# Get top 5 conserved and variable positions
+TOP_CONSERVED=$($MYSQL_CMD "SELECT position, entropy FROM conservation_results WHERE conservation_id = $CONSERVATION_ID ORDER BY entropy ASC LIMIT 5")
+TOP_VARIABLE=$($MYSQL_CMD "SELECT position, entropy FROM conservation_results WHERE conservation_id = $CONSERVATION_ID ORDER BY entropy DESC LIMIT 5")
 
 # Generate report text
-report_text = """$REPORT_TEXT"""
+REPORT_TEXT+="\n=== Shannon Entropy Results ===\n"
+REPORT_TEXT+="Alignment length: $ALIGN_LENGTH residues\n"
+REPORT_TEXT+="Mean entropy: $MEAN_ENTROPY bits\n"
+REPORT_TEXT+="Max entropy: $MAX_ENTROPY bits (position $MAX_POS)\n"
+REPORT_TEXT+="Min entropy: $MIN_ENTROPY bits (position $MIN_POS)\n"
 
-report_text += "\n=== Shannon Entropy Results ===\n"
-report_text += f"Number of sequences: {num_sequences}\n"
-report_text += f"Alignment length: {alignment_length} residues\n"
-report_text += f"Mean entropy: {mean_entropy:.3f} bits\n"
-report_text += f"Max entropy: {max_entropy:.3f} bits (position {max_pos})\n"
-report_text += f"Min entropy: {min_entropy:.3f} bits (position {min_pos})\n"
+REPORT_TEXT+="\nTop 5 most conserved positions:\n"
+echo "$TOP_CONSERVED" | while read -r pos entropy; do
+    REPORT_TEXT+="Position $pos: $entropy bits\n"
+done
 
-# Top conserved/variable positions
-sorted_positions = sorted(enumerate(entropy_results), key=lambda x: x[1])
-report_text += "\nTop 5 most conserved positions:\n"
-for pos, ent in sorted_positions[:5]:
-    report_text += f"Position {pos+1}: {ent:.3f} bits\n"
+REPORT_TEXT+="\nTop 5 most variable positions:\n"
+echo "$TOP_VARIABLE" | while read -r pos entropy; do
+    REPORT_TEXT+="Position $pos: $entropy bits\n"
+done
 
-report_text += "\nTop 5 most variable positions:\n"
-for pos, ent in sorted(sorted_positions[-5:], key=lambda x: -x[1]):
-    report_text += f"Position {pos+1}: {ent:.3f} bits\n"
+REPORT_TEXT+="\nAnalysis completed successfully.\n"
 
-report_text += "\nAnalysis completed successfully.\n"
-
-# Store report in database
-cursor.execute("""
-    INSERT INTO conservation_reports
+# Store report in database (escape single quotes for MySQL)
+ESCAPED_REPORT_TEXT=$(echo "$REPORT_TEXT" | sed "s/'/''/g")
+$MYSQL_CMD "INSERT INTO conservation_reports
     (conservation_id, report_text, mean_entropy, max_entropy, min_entropy, max_position, min_position)
-    VALUES ($CONSERVATION_ID, %s, %s, %s, %s, %s, %s)
-""", (report_text, float(mean_entropy), float(max_entropy), float(min_entropy), max_pos, min_pos))
-
-db.commit()
-db.close()
-EOF
+    VALUES ($CONSERVATION_ID, '$ESCAPED_REPORT_TEXT', $MEAN_ENTROPY, $MAX_ENTROPY, $MIN_ENTROPY, $MAX_POS, $MIN_POS)"
 
 # Clean up temporary files
-rm -f $FASTA_FILE $ALIGN_FILE
+rm -f $FASTA_FILE $ALIGN_FILE position_counts.tmp
 
 # Update status to completed
 $MYSQL_CMD "UPDATE conservation_jobs SET status = 'completed' WHERE conservation_id = $CONSERVATION_ID"
