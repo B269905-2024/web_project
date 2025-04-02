@@ -6,7 +6,7 @@ CONSERVATION_ID="$2"
 WINDOW_SIZE="${3:-4}"
 
 # Database credentials from config.php
-CONFIG_FILE="/path/to/your/config.php"
+CONFIG_FILE="config.php"
 
 # Parse database config from PHP file
 DB_HOST=$(grep "hostname" $CONFIG_FILE | cut -d'"' -f2)
