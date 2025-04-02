@@ -1,5 +1,8 @@
 <?php
-session_start();
+// Start session only if not already started
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Enhanced error reporting
 error_reporting(E_ALL);
@@ -56,65 +59,57 @@ try {
             exit();
         }
 
-        // Create individual FASTA files for debugging
-        $fasta_files = [];
-        $fasta_content = '';
-        foreach ($sequences as $seq) {
-            $individual_file = tempnam(sys_get_temp_dir(), 'motif_seq_');
-            file_put_contents($individual_file, ">{$seq['ncbi_id']}\n{$seq['sequence']}\n");
-            $fasta_files[] = [
-                'file' => $individual_file,
-                'ncbi_id' => $seq['ncbi_id'],
-                'size' => filesize($individual_file)
-            ];
-            $fasta_content .= ">{$seq['ncbi_id']}\n{$seq['sequence']}\n";
-        }
-
-        // Create combined FASTA file
-        $combined_file = tempnam(sys_get_temp_dir(), 'motif_combined_');
-        file_put_contents($combined_file, $fasta_content);
-
-        // Execute patmatmotifs on combined file
-        $output = [];
-        $return_var = 0;
-        $command = "/usr/bin/patmatmotifs -sequence $combined_file -full Y -auto 2>&1";
-        exec($command, $output, $return_var);
-        
-        $output_text = implode("\n", $output);
-
-        // Store debug info
+        // Initialize debug info
         $_SESSION['motif_debug'] = [
             'sequences_count' => $sequence_count,
-            'individual_files' => $fasta_files,
-            'combined_file' => [
-                'path' => $combined_file,
-                'size' => filesize($combined_file),
-                'content_sample' => substr($fasta_content, 0, 500) . (strlen($fasta_content) > 500 ? '...' : '')
-            ],
-            'command' => $command,
-            'output' => $output_text,
-            'return_code' => $return_var
+            'processed_sequences' => [],
+            'fasta_content' => ''
         ];
 
-        // Clean up files
-        foreach ($fasta_files as $file) {
-            if (file_exists($file['file'])) {
-                unlink($file['file']);
-            }
+        $output_dir = sys_get_temp_dir();
+        $motif_count = 0;
+        
+        // Create combined FASTA content
+        $fasta_content = '';
+        foreach ($sequences as $seq) {
+            $fasta_content .= ">{$seq['ncbi_id']}\n{$seq['sequence']}\n";
+            // Store each processed sequence for debugging
+            $_SESSION['motif_debug']['processed_sequences'][] = [
+                'ncbi_id' => $seq['ncbi_id'],
+                'sequence' => $seq['sequence']
+            ];
         }
-        if (file_exists($combined_file)) {
-            unlink($combined_file);
+        $_SESSION['motif_debug']['fasta_content'] = $fasta_content;
+
+        // Create temporary FASTA file with proper permissions
+        $fasta_file = tempnam(sys_get_temp_dir(), 'motif_');
+        file_put_contents($fasta_file, $fasta_content);
+        chmod($fasta_file, 0644);
+
+        // Build command with explicit output directory
+        $command = "/usr/bin/patmatmotifs -sequence $fasta_file -full Y -outfile $output_dir/patmatmotifs_output.txt -auto 2>&1";
+
+        // Execute command
+        $output = [];
+        $return_var = 0;
+        exec($command, $output, $return_var);
+        $output_text = implode("\n", $output);
+
+        // Store complete debug info
+        $_SESSION['motif_debug']['command'] = $command;
+        $_SESSION['motif_debug']['output'] = $output_text;
+        $_SESSION['motif_debug']['return_code'] = $return_var;
+
+        // Clean up
+        if (file_exists($fasta_file)) {
+            unlink($fasta_file);
         }
 
         if ($return_var !== 0) {
             throw new Exception("patmatmotifs failed with code $return_var");
         }
 
-        if (empty($output_text)) {
-            throw new Exception("patmatmotifs returned empty output");
-        }
-
-        // Parse results
+        // Parse results if successful
         $current_seq = '';
         $motif_count = 0;
         
@@ -167,6 +162,9 @@ try {
 
 } catch (Exception $e) {
     error_log("Motif analysis error: " . $e->getMessage());
+    $_SESSION['error'] = "Motif analysis failed: " . $e->getMessage();
+    header("Location: results.php?job_id=$job_id");
+    exit();
 }
 ?>
 
@@ -178,12 +176,15 @@ try {
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; margin: 0; padding: 20px; color: #333; background-color: #f9f9f9; }
         .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
         .debug-info { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-top: 20px; }
-        pre { white-space: pre-wrap; background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #ddd; overflow-x: auto; max-height: 400px; }
+        pre { white-space: pre-wrap; background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #ddd; overflow-x: auto; }
         .file-info { margin-bottom: 15px; }
         .file-info h4 { margin-bottom: 5px; }
         .nav-links { margin-bottom: 20px; }
         .nav-links a { margin-right: 15px; text-decoration: none; color: #3498db; }
         .no-results { background: #fdecea; padding: 20px; border-radius: 8px; }
+        .full-fasta { max-height: 500px; overflow-y: auto; }
+        .sequence-block { margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
+        .error { color: #e74c3c; background: #fdecea; padding: 10px; border-radius: 4px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -194,61 +195,55 @@ try {
             <a href="results.php?job_id=<?= $job_id ?>">Back to Results</a>
         </div>
 
-        <h1>Motif Analysis: <?= htmlspecialchars($job['search_term']) ?></h1>
+        <h1>Motif Analysis: <?= htmlspecialchars($job['search_term'] ?? 'Unknown') ?></h1>
         
+        <?php if (isset($_SESSION['error'])): ?>
+            <div class="error">
+                <?= htmlspecialchars($_SESSION['error']) ?>
+            </div>
+            <?php unset($_SESSION['error']); ?>
+        <?php endif; ?>
+
         <div class="summary-section">
             <h2>Analysis Summary</h2>
             <p><strong>Job ID:</strong> <?= $job_id ?></p>
-            <p><strong>Taxonomic Group:</strong> <?= htmlspecialchars($job['taxon']) ?></p>
+            <p><strong>Taxonomic Group:</strong> <?= htmlspecialchars($job['taxon'] ?? 'Unknown') ?></p>
             <p><strong>Sequences Analyzed:</strong> <?= $_SESSION['motif_debug']['sequences_count'] ?? '0' ?></p>
             <p><strong>Total Motifs Found:</strong> <?= count($results ?? []) ?></p>
         </div>
 
+        <div class="sequences-analyzed">
+            <h2>Sequences Analyzed</h2>
+            <?php if (!empty($_SESSION['motif_debug']['processed_sequences'])): ?>
+                <?php foreach ($_SESSION['motif_debug']['processed_sequences'] as $seq): ?>
+                    <div class="sequence-block">
+                        <h3><?= htmlspecialchars($seq['ncbi_id']) ?></h3>
+                        <pre><?= htmlspecialchars($seq['sequence']) ?></pre>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <p>No sequence information available.</p>
+            <?php endif; ?>
+        </div>
+
         <?php if (!empty($results)): ?>
-            <!-- Results display -->
+            <h2>Motif Results</h2>
+            <!-- Your existing results display code here -->
         <?php else: ?>
             <div class="no-results">
                 <h3>No Motifs Found</h3>
-                
                 <?php if (isset($_SESSION['motif_debug'])): ?>
-                <div class="debug-info">
-                    <h4>Detailed Debug Information</h4>
-                    
-                    <div class="file-info">
-                        <h4>Sequence Files Processed (<?= count($_SESSION['motif_debug']['individual_files'] ?? []) ?>)</h4>
-                        <ul>
-                            <?php foreach ($_SESSION['motif_debug']['individual_files'] as $file): ?>
-                                <li><?= htmlspecialchars($file['ncbi_id']) ?> (<?= $file['size'] ?> bytes)</li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                    
-                    <div class="file-info">
-                        <h4>Combined FASTA File</h4>
-                        <p><strong>Size:</strong> <?= $_SESSION['motif_debug']['combined_file']['size'] ?? '0' ?> bytes</p>
-                        <p><strong>Sample:</strong></p>
-                        <pre><?= htmlspecialchars($_SESSION['motif_debug']['combined_file']['content_sample'] ?? 'No content') ?></pre>
-                    </div>
-                    
-                    <div class="command-info">
-                        <h4>Execution Details</h4>
-                        <p><strong>Command:</strong> <code><?= htmlspecialchars($_SESSION['motif_debug']['command'] ?? 'Not executed') ?></code></p>
-                        <p><strong>Return Code:</strong> <?= $_SESSION['motif_debug']['return_code'] ?? 'N/A' ?></p>
+                    <div class="debug-info">
+                        <h4>Debug Information</h4>
+                        <p><strong>Command Executed:</strong></p>
+                        <pre><?= htmlspecialchars($_SESSION['motif_debug']['command'] ?? '') ?></pre>
                         <p><strong>Output:</strong></p>
-                        <pre><?= htmlspecialchars($_SESSION['motif_debug']['output'] ?? 'No output') ?></pre>
+                        <pre><?= htmlspecialchars($_SESSION['motif_debug']['output'] ?? '') ?></pre>
+                        <p><strong>Return Code:</strong> <?= $_SESSION['motif_debug']['return_code'] ?? '' ?></p>
+                        <h4>Complete FASTA Content:</h4>
+                        <pre><?= htmlspecialchars($_SESSION['motif_debug']['fasta_content'] ?? '') ?></pre>
                     </div>
-                </div>
                 <?php endif; ?>
-                
-                <div class="troubleshooting">
-                    <h4>Next Steps:</h4>
-                    <ol>
-                        <li>Verify each sequence file contains valid protein data</li>
-                        <li>Check the combined FASTA format matches expected format</li>
-                        <li>Test patmatmotifs manually with the sample sequences</li>
-                        <li>Review server error logs for additional details</li>
-                    </ol>
-                </div>
             </div>
         <?php endif; ?>
     </div>
