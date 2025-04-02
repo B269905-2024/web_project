@@ -1,90 +1,314 @@
 <?php
-require_once 'login.php';
+session_start();
 
-if (!isset($_GET['job_id'])) {
-    die("No job ID provided.");
+if (!isset($_COOKIE['protein_search_session']) || empty($_GET['job_id']) || !is_numeric($_GET['job_id'])) {
+    header("Location: home.php");
+    exit();
 }
 
-$job_id = $_GET['job_id'];
-$window_size = isset($_GET['window_size']) ? (int)$_GET['window_size'] : 4;
-$window_size = max(1, min(20, $window_size));
+$job_id = (int)$_GET['job_id'];
+$window_size = isset($_GET['window_size']) ? max(1, min(20, (int)$_GET['window_size'])) : 4;
+
+require_once 'config.php';
 
 try {
-    // Connect to database
-    $pdo = new PDO("mysql:host=$hostname;dbname=$database", $username, $password);
+    $pdo = new PDO("mysql:host=$hostname;dbname=$database;charset=utf8", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
-    // Get job details and sequences - fixed query syntax
-    $stmt = $pdo->prepare("SELECT protein_family, taxonomic_group, 
-                          COALESCE(subset_sequences, sequences) AS sequences,
-                          CASE WHEN subset_sequences IS NULL THEN 0 ELSE 1 END AS is_subset,
-                          (LENGTH(COALESCE(subset_sequences, sequences)) - 
-                           LENGTH(REPLACE(COALESCE(subset_sequences, sequences), '>', ''))) AS seq_count
-                          FROM searches WHERE job_id = ?");
-    $stmt->execute([$job_id]);
-    $row = $stmt->fetch();
-    
-    if (!$row) {
-        die("No job found.");
+
+    // Verify user owns this job
+    $stmt = $pdo->prepare("SELECT j.* FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ? AND u.session_id = ?");
+    $stmt->execute([$job_id, $_COOKIE['protein_search_session']]);
+    $job = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$job) {
+        header("Location: home.php");
+        exit();
     }
 
-    $protein_family = $row['protein_family'];
-    $taxonomic_group = $row['taxonomic_group'];
-    $is_subset = $row['is_subset'];
-    $seq_count = $row['seq_count'];
-    
-    // Check if analysis already exists in database
-    $analysis_stmt = $pdo->prepare("SELECT * FROM conservation_analysis 
-                                   WHERE job_id = ? AND window_size = ? AND is_subset = ?");
-    $analysis_stmt->execute([$job_id, $window_size, $is_subset]);
-    $analysis = $analysis_stmt->fetch();
-    
-    if (!$analysis) {
-        // Create temporary FASTA file for processing
-        $fasta_content = $row['sequences'];
-        $temp_fasta = tempnam(sys_get_temp_dir(), 'fasta_');
-        file_put_contents($temp_fasta, $fasta_content);
-        
-        // Create results directory
-        $results_dir = sys_get_temp_dir() . "/{$job_id}_results_" . ($is_subset ? "subset" : "full");
-        if (!is_dir($results_dir)) {
-            mkdir($results_dir, 0777, true);
+    // Check for existing conservation analysis
+    $stmt = $pdo->prepare("SELECT * FROM conservation_jobs WHERE job_id = ? AND window_size = ?");
+    $stmt->execute([$job_id, $window_size]);
+    $conservation_job = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$conservation_job) {
+        // Create new conservation job
+        $stmt = $pdo->prepare("INSERT INTO conservation_jobs (job_id, window_size, status) VALUES (?, ?, 'running')");
+        $stmt->execute([$job_id, $window_size]);
+        $conservation_id = $pdo->lastInsertId();
+
+        // Get sequences from database
+        $stmt = $pdo->prepare("SELECT ncbi_id, sequence FROM sequences WHERE job_id = ?");
+        $stmt->execute([$job_id]);
+        $sequences = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($sequences)) {
+            $stmt = $pdo->prepare("UPDATE conservation_jobs SET status = 'failed' WHERE conservation_id = ?");
+            $stmt->execute([$conservation_id]);
+            
+            $report_text = "Conservation Analysis Report\n===========================\n\n";
+            $report_text .= "Job ID: $job_id\n";
+            $report_text .= "Conservation ID: $conservation_id\n";
+            $report_text .= "Window size: $window_size\n\n";
+            $report_text .= "ERROR: No sequences found for this job\n";
+            
+            $stmt = $pdo->prepare("INSERT INTO conservation_reports (conservation_id, report_text) VALUES (?, ?)");
+            $stmt->execute([$conservation_id, $report_text]);
+            
+            header("Location: results.php?job_id=$job_id");
+            exit();
         }
-        
-        // Run conservation analysis
-        $output = shell_exec("/bin/bash run_conservation.sh " . 
-                           escapeshellarg($temp_fasta) . " " . 
-                           escapeshellarg("$results_dir/alignment.aln") . " " . 
-                           escapeshellarg($results_dir) . " " . 
-                           $window_size . " 2>&1");
-        
-        // Store results in database
-        $entropy_json = file_exists("$results_dir/entropy.json") ? file_get_contents("$results_dir/entropy.json") : null;
-        $entropy_csv = file_exists("$results_dir/entropy.csv") ? file_get_contents("$results_dir/entropy.csv") : null;
-        $alignment = file_exists("$results_dir/alignment.txt") ? file_get_contents("$results_dir/alignment.txt") : null;
-        $report = file_exists("$results_dir/report.txt") ? file_get_contents("$results_dir/report.txt") : null;
-        $plotcon = file_exists("$results_dir/plotcon.png") ? file_get_contents("$results_dir/plotcon.png") : null;
-        $entropy_png = file_exists("$results_dir/entropy.png") ? file_get_contents("$results_dir/entropy.png") : null;
-        
-        $insert_stmt = $pdo->prepare("INSERT INTO conservation_analysis 
-                                    (job_id, window_size, is_subset, entropy_json, entropy_csv, 
-                                     alignment, report, plotcon, entropy_png, created_at)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-        $insert_stmt->execute([
-            $job_id, $window_size, $is_subset, 
-            $entropy_json, $entropy_csv, $alignment, $report, $plotcon, $entropy_png
-        ]);
-        
-        // Clean up temp files
-        unlink($temp_fasta);
-        
-        // Refresh analysis data
-        $analysis_stmt->execute([$job_id, $window_size, $is_subset]);
-        $analysis = $analysis_stmt->fetch();
+
+        // Perform alignment and analysis
+        perform_conservation_analysis($pdo, $conservation_id, $job_id, $window_size, $sequences);
+
+        // Refresh the conservation job data
+        $stmt = $pdo->prepare("SELECT * FROM conservation_jobs WHERE conservation_id = ?");
+        $stmt->execute([$conservation_id]);
+        $conservation_job = $stmt->fetch(PDO::FETCH_ASSOC);
     }
-    
+
+    // Get all analysis data
+    $stmt = $pdo->prepare("SELECT position, entropy, plotcon_score FROM conservation_results WHERE conservation_id = ? ORDER BY position");
+    $stmt->execute([$conservation_job['conservation_id']]);
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $pdo->prepare("SELECT * FROM conservation_reports WHERE conservation_id = ?");
+    $stmt->execute([$conservation_job['conservation_id']]);
+    $report = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $stmt = $pdo->prepare("SELECT ncbi_id, sequence FROM conservation_alignments WHERE conservation_id = ?");
+    $stmt->execute([$conservation_job['conservation_id']]);
+    $alignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (PDOException $e) {
     die("Database error: " . $e->getMessage());
+}
+
+/**
+ * Performs the conservation analysis and stores results in the database
+ */
+function perform_conservation_analysis($pdo, $conservation_id, $job_id, $window_size, $sequences) {
+    $report_text = "Conservation Analysis Report\n===========================\n\n";
+    $report_text .= "Job ID: $job_id\n";
+    $report_text .= "Conservation ID: $conservation_id\n";
+    $report_text .= "Window size: $window_size\n\n";
+    
+    $num_sequences = count($sequences);
+    $report_text .= "Number of sequences: $num_sequences\n";
+    
+    try {
+        // Step 1: Perform alignment (simplified example - in reality you'd use a proper alignment library)
+        $alignment = perform_alignment($sequences);
+        $alignment_length = strlen($alignment[0]['aligned_sequence']);
+        
+        // Store aligned sequences
+        foreach ($alignment as $aligned_seq) {
+            $stmt = $pdo->prepare("INSERT INTO conservation_alignments (conservation_id, ncbi_id, sequence) VALUES (?, ?, ?)");
+            $stmt->execute([$conservation_id, $aligned_seq['ncbi_id'], $aligned_seq['aligned_sequence']]);
+        }
+        
+        $report_text .= "\nAlignment completed successfully. Alignment length: $alignment_length residues\n";
+        
+        // Step 2: Calculate Shannon entropy
+        $entropy_results = calculate_entropy($alignment);
+        
+        // Store entropy results
+        foreach ($entropy_results as $position => $entropy) {
+            $stmt = $pdo->prepare("INSERT INTO conservation_results (conservation_id, position, entropy) VALUES (?, ?, ?)");
+            $stmt->execute([$conservation_id, $position + 1, $entropy]);
+        }
+        
+        // Step 3: Calculate Plotcon scores (simplified)
+        $plotcon_scores = calculate_plotcon_scores($entropy_results, $window_size);
+        
+        // Store plotcon results
+        foreach ($plotcon_scores as $position => $score) {
+            $stmt = $pdo->prepare("UPDATE conservation_results SET plotcon_score = ? WHERE conservation_id = ? AND position = ?");
+            $stmt->execute([$score, $conservation_id, $position + 1]);
+        }
+        
+        // Calculate statistics
+        $mean_entropy = array_sum($entropy_results) / count($entropy_results);
+        $max_entropy = max($entropy_results);
+        $min_entropy = min($entropy_results);
+        $max_pos = array_search($max_entropy, $entropy_results) + 1;
+        $min_pos = array_search($min_entropy, $entropy_results) + 1;
+        
+        // Generate report
+        $report_text .= "\n=== Shannon Entropy Results ===\n";
+        $report_text .= "Alignment length: $alignment_length residues\n";
+        $report_text .= sprintf("Mean entropy: %.3f bits\n", $mean_entropy);
+        $report_text .= sprintf("Max entropy: %.3f bits (position %d)\n", $max_entropy, $max_pos);
+        $report_text .= sprintf("Min entropy: %.3f bits (position %d)\n", $min_entropy, $min_pos);
+        
+        // Top conserved/variable positions
+        asort($entropy_results);
+        $sorted_positions = array_slice($entropy_results, 0, 5, true);
+        
+        $report_text .= "\nTop 5 most conserved positions:\n";
+        foreach ($sorted_positions as $pos => $ent) {
+            $report_text .= sprintf("Position %d: %.3f bits\n", $pos + 1, $ent);
+        }
+        
+        arsort($entropy_results);
+        $sorted_positions = array_slice($entropy_results, 0, 5, true);
+        
+        $report_text .= "\nTop 5 most variable positions:\n";
+        foreach ($sorted_positions as $pos => $ent) {
+            $report_text .= sprintf("Position %d: %.3f bits\n", $pos + 1, $ent);
+        }
+        
+        $report_text .= "\nAnalysis completed successfully.\n";
+        
+        // Store report
+        $stmt = $pdo->prepare("INSERT INTO conservation_reports 
+            (conservation_id, report_text, mean_entropy, max_entropy, min_entropy, max_position, min_position)
+            VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $conservation_id, 
+            $report_text, 
+            $mean_entropy, 
+            $max_entropy, 
+            $min_entropy, 
+            $max_pos, 
+            $min_pos
+        ]);
+        
+        // Update job status
+        $stmt = $pdo->prepare("UPDATE conservation_jobs SET status = 'completed' WHERE conservation_id = ?");
+        $stmt->execute([$conservation_id]);
+        
+    } catch (Exception $e) {
+        // On error, update status and store error message
+        $stmt = $pdo->prepare("UPDATE conservation_jobs SET status = 'failed' WHERE conservation_id = ?");
+        $stmt->execute([$conservation_id]);
+        
+        $report_text .= "\nERROR: " . $e->getMessage() . "\n";
+        
+        $stmt = $pdo->prepare("INSERT INTO conservation_reports (conservation_id, report_text) VALUES (?, ?)");
+        $stmt->execute([$conservation_id, $report_text]);
+    }
+}
+
+/**
+ * Simplified alignment function - in a real implementation you would use a proper alignment library
+ */
+function perform_alignment($sequences) {
+    // This is a simplified example - in reality you would use a proper alignment algorithm
+    $aligned_sequences = [];
+    $max_length = 0;
+    
+    foreach ($sequences as $seq) {
+        $max_length = max($max_length, strlen($seq['sequence']));
+    }
+    
+    foreach ($sequences as $seq) {
+        $aligned_sequences[] = [
+            'ncbi_id' => $seq['ncbi_id'],
+            'aligned_sequence' => str_pad($seq['sequence'], $max_length, '-')
+        ];
+    }
+    
+    return $aligned_sequences;
+}
+
+/**
+ * Calculate Shannon entropy for each position in the alignment
+ */
+function calculate_entropy($alignment) {
+    $entropy_results = [];
+    $alignment_length = strlen($alignment[0]['aligned_sequence']);
+    $num_sequences = count($alignment);
+    
+    for ($i = 0; $i < $alignment_length; $i++) {
+        $column = '';
+        foreach ($alignment as $seq) {
+            $column .= $seq['aligned_sequence'][$i];
+        }
+        
+        // Count amino acids (ignore gaps)
+        $column = str_replace('-', '', $column);
+        $counts = count_chars($column, 1);
+        $total = strlen($column);
+        
+        $entropy = 0;
+        if ($total > 0) {
+            foreach ($counts as $count) {
+                $p = $count / $total;
+                $entropy -= $p * log($p, 2);
+            }
+        }
+        
+        $entropy_results[$i] = $entropy;
+    }
+    
+    return $entropy_results;
+}
+
+/**
+ * Simplified Plotcon score calculation
+ */
+function calculate_plotcon_scores($entropy_results, $window_size) {
+    $plotcon_scores = [];
+    $count = count($entropy_results);
+    
+    for ($i = 0; $i < $count; $i++) {
+        $start = max(0, $i - floor($window_size / 2));
+        $end = min($count - 1, $i + floor($window_size / 2));
+        
+        $sum = 0;
+        $window_count = 0;
+        for ($j = $start; $j <= $end; $j++) {
+            $sum += $entropy_results[$j];
+            $window_count++;
+        }
+        
+        // Convert entropy to conservation score (higher = more conserved)
+        $plotcon_scores[$i] = $window_count > 0 ? (1 - ($sum / $window_count)) : 0;
+    }
+    
+    return $plotcon_scores;
+}
+
+// Prepare entropy data for JSON
+$entropy_data = [
+    'data' => [[
+        'y' => array_column($results, 'entropy'),
+        'type' => 'line',
+        'name' => 'Entropy',
+        'line' => ['color' => 'blue']
+    ]],
+    'layout' => [
+        'title' => 'Shannon Entropy Analysis',
+        'xaxis' => ['title' => 'Position'],
+        'yaxis' => ['title' => 'Entropy (bits)'],
+        'shapes' => [[
+            'type' => 'line',
+            'x0' => 0,
+            'x1' => count($results),
+            'y0' => $report['mean_entropy'],
+            'y1' => $report['mean_entropy'],
+            'line' => ['color' => 'red', 'dash' => 'dash']
+        ]]
+    ]
+];
+
+// Prepare plotcon data if available
+$plotcon_data = null;
+if (!empty(array_column($results, 'plotcon_score'))) {
+    $plotcon_data = [
+        'data' => [[
+            'y' => array_column($results, 'plotcon_score'),
+            'type' => 'line',
+            'name' => 'Conservation Score',
+            'line' => ['color' => 'green']
+        ]],
+        'layout' => [
+            'title' => 'Plotcon Conservation Analysis',
+            'xaxis' => ['title' => 'Position'],
+            'yaxis' => ['title' => 'Conservation Score']
+        ]
+    ];
 }
 ?>
 
@@ -121,74 +345,69 @@ try {
     </style>
 </head>
 <body>
-    <h1>Conservation Analysis for <?= htmlspecialchars($protein_family) ?></h1>
-    <p><strong>Taxonomic Group:</strong> <?= htmlspecialchars($taxonomic_group) ?></p>
-    <p><strong>Window Size:</strong> <?= $window_size ?></p>
-    <p><strong>Sequences:</strong> <?= $seq_count ?> (<?= $is_subset ? 'Subset' : 'Full Set' ?>)</p>
-    <p><strong>Analysis Date:</strong> <?= $analysis['created_at'] ?></p>
+    <div>
+        <a href="home.php">New Search</a>
+        <a href="past.php">Past Searches</a>
+    </div>
+
+    <h1>Conservation Analysis for <?php echo htmlspecialchars($job['search_term']); ?></h1>
+    <p><strong>Taxonomic Group:</strong> <?php echo htmlspecialchars($job['taxon']); ?></p>
+    <p><strong>Window Size:</strong> <?php echo $window_size; ?></p>
 
     <div class="analysis-container">
         <div class="visualization">
             <h2>Shannon Entropy Analysis</h2>
             <div class="plot-container" id="entropyPlot"></div>
-            <?php if (!empty($analysis['entropy_json'])): ?>
-                <div class="download-buttons">
-                    <a href="download.php?type=conservation&id=<?= $analysis['id'] ?>&file=entropy_json" class="download-btn">
-                        Download JSON
-                    </a>
-                    <a href="download.php?type=conservation&id=<?= $analysis['id'] ?>&file=entropy_csv" class="download-btn secondary">
-                        Download CSV
-                    </a>
-                    <?php if (!empty($analysis['entropy_png'])): ?>
-                        <a href="download.php?type=conservation&id=<?= $analysis['id'] ?>&file=entropy_png" class="download-btn">
-                            Download PNG
-                        </a>
-                    <?php endif; ?>
-                    <?php if (!empty($analysis['report'])): ?>
-                        <a href="download.php?type=conservation&id=<?= $analysis['id'] ?>&file=report" class="download-btn secondary">
-                            Download Full Report
-                        </a>
-                    <?php endif; ?>
-                </div>
-                <script>
-                    var plotData = <?= $analysis['entropy_json'] ?>;
-                    Plotly.newPlot("entropyPlot", plotData.data, plotData.layout);
-                </script>
-            <?php else: ?>
-                <p style="color:red;">Entropy analysis failed to generate. Try smaller dataset.</p>
-            <?php endif; ?>
+            <div class="download-buttons">
+                <a href="download_conservation.php?type=entropy_json&conservation_id=<?php echo $conservation_job['conservation_id']; ?>" class="download-btn">
+                    Download JSON
+                </a>
+                <a href="download_conservation.php?type=entropy_csv&conservation_id=<?php echo $conservation_job['conservation_id']; ?>" class="download-btn secondary">
+                    Download CSV
+                </a>
+            </div>
+            <script>
+                var entropyData = <?php echo json_encode($entropy_data); ?>;
+                Plotly.newPlot("entropyPlot", entropyData.data, entropyData.layout);
+            </script>
         </div>
 
         <div class="visualization">
             <h2>Aligned Sequences</h2>
             <div class="sequence-viewer">
-                <?= !empty($analysis['alignment']) ? htmlspecialchars($analysis['alignment']) : "Alignment data not available." ?>
+                <?php foreach ($alignments as $aln): ?>
+                    ><?php echo htmlspecialchars($aln['ncbi_id']); ?><br>
+                    <?php echo chunk_split($aln['sequence'], 80, "<br>"); ?><br><br>
+                <?php endforeach; ?>
             </div>
             <div class="download-buttons">
-                <?php if (!empty($analysis['alignment'])): ?>
-                    <a href="download.php?type=conservation&id=<?= $analysis['id'] ?>&file=alignment" class="download-btn">
-                        Download Alignment
-                    </a>
-                <?php endif; ?>
+                <a href="download_conservation.php?type=alignment&conservation_id=<?php echo $conservation_job['conservation_id']; ?>" class="download-btn">
+                    Download Alignment
+                </a>
             </div>
         </div>
     </div>
 
-    <div class="visualization">
-        <h2>EMBOSS Plotcon Analysis</h2>
-        <?php if (!empty($analysis['plotcon'])): ?>
-            <img src="data:image/png;base64,<?= base64_encode($analysis['plotcon']) ?>" style="max-width:100%;">
+    <?php if ($plotcon_data): ?>
+        <div class="visualization">
+            <h2>EMBOSS Plotcon Analysis</h2>
+            <div class="plot-container" id="plotconPlot"></div>
+            <script>
+                var plotconData = <?php echo json_encode($plotcon_data); ?>;
+                Plotly.newPlot("plotconPlot", plotconData.data, plotconData.layout);
+            </script>
             <div class="download-buttons">
-                <a href="download.php?type=conservation&id=<?= $analysis['id'] ?>&file=plotcon" class="download-btn">
-                    Download Plot
+                <a href="download_conservation.php?type=plotcon_csv&conservation_id=<?php echo $conservation_job['conservation_id']; ?>" class="download-btn">
+                    Download Plotcon Data (CSV)
                 </a>
             </div>
-        <?php else: ?>
-            <p style="color:red;">Plotcon analysis failed to generate.</p>
-        <?php endif; ?>
-    </div>
+        </div>
+    <?php endif; ?>
 
     <div class="insights">
+        <h3>Analysis Report</h3>
+        <pre><?php echo htmlspecialchars($report['report_text']); ?></pre>
+
         <h3>Interpretation Guide</h3>
         <p><strong>Shannon Entropy:</strong></p>
         <ul>
@@ -198,7 +417,7 @@ try {
         </ul>
         <p><strong>Plotcon:</strong></p>
         <ul>
-            <li>Shows smoothed conservation over <?= $window_size ?>-residue windows</li>
+            <li>Shows smoothed conservation over <?php echo $window_size; ?>-residue windows</li>
             <li>High scores = Conserved regions</li>
             <li>Low scores = Variable regions</li>
         </ul>

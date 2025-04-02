@@ -1,58 +1,84 @@
 #!/bin/bash
 
 # Input parameters
-FASTA_FILE="$1"
-ALIGN_FILE="$2"
-RESULTS_DIR="$3"
-WINDOW_SIZE="${4:-4}"
+JOB_ID="$1"
+CONSERVATION_ID="$2"
+WINDOW_SIZE="${3:-4}"
 
-# Create results directory
-mkdir -p "$RESULTS_DIR"
+# Database credentials from config.php
+CONFIG_FILE="/path/to/your/config.php"
 
-# Initialize report file
-REPORT_FILE="$RESULTS_DIR/report.txt"
-echo "Conservation Analysis Report" > "$REPORT_FILE"
-echo "===========================" >> "$REPORT_FILE"
-echo "" >> "$REPORT_FILE"
+# Parse database config from PHP file
+DB_HOST=$(grep "hostname" $CONFIG_FILE | cut -d'"' -f2)
+DB_NAME=$(grep "database" $CONFIG_FILE | cut -d'"' -f2)
+DB_USER=$(grep "username" $CONFIG_FILE | cut -d'"' -f2)
+DB_PASS=$(grep "password" $CONFIG_FILE | cut -d'"' -f2)
 
-# 1. Run Clustal Omega alignment if not already done
-if [ ! -f "$ALIGN_FILE" ]; then
-    echo "Running Clustal Omega alignment..." >> "$REPORT_FILE"
-    clustalo -i "$FASTA_FILE" -o "$ALIGN_FILE" --force --threads=1 --outfmt=clustal 2>&1 | tee -a "$REPORT_FILE"
+# Connect to MySQL
+MYSQL_CMD="mysql -h$DB_HOST -u$DB_USER -p$DB_PASS $DB_NAME -N -B -e"
 
-    if [ ! -s "$ALIGN_FILE" ]; then
-        echo "ERROR: Clustal Omega alignment failed" >> "$REPORT_FILE"
-        exit 1
-    fi
-    echo "Alignment completed successfully." >> "$REPORT_FILE"
-    echo "" >> "$REPORT_FILE"
+# Update status to running
+$MYSQL_CMD "UPDATE conservation_jobs SET status = 'running' WHERE conservation_id = $CONSERVATION_ID"
+
+# Initialize report
+REPORT_TEXT="Conservation Analysis Report\n===========================\n\n"
+REPORT_TEXT+="Job ID: $JOB_ID\n"
+REPORT_TEXT+="Conservation ID: $CONSERVATION_ID\n"
+REPORT_TEXT+="Window size: $WINDOW_SIZE\n\n"
+
+# 1. Get sequences from database and create temporary FASTA file
+$MYSQL_CMD "SELECT ncbi_id, sequence FROM sequences WHERE job_id = $JOB_ID" > sequences.tmp
+
+FASTA_FILE="sequences_${JOB_ID}.fasta"
+while read -r line; do
+    ncbi_id=$(echo "$line" | cut -f1)
+    sequence=$(echo "$line" | cut -f2)
+    echo ">$ncbi_id" >> $FASTA_FILE
+    echo "$sequence" >> $FASTA_FILE
+done < sequences.tmp
+rm sequences.tmp
+
+NUM_SEQUENCES=$(grep -c ">" $FASTA_FILE)
+REPORT_TEXT+="Number of sequences: $NUM_SEQUENCES\n"
+
+# 2. Run Clustal Omega alignment
+ALIGN_FILE="alignment_${JOB_ID}.aln"
+REPORT_TEXT+="\nRunning Clustal Omega alignment...\n"
+clustalo -i $FASTA_FILE -o $ALIGN_FILE --force --threads=1 --outfmt=clustal 2>&1 | tee -a report.tmp
+REPORT_TEXT+=$(cat report.tmp)
+rm report.tmp
+
+if [ ! -s "$ALIGN_FILE" ]; then
+    REPORT_TEXT+="\nERROR: Clustal Omega alignment failed\n"
+    $MYSQL_CMD "UPDATE conservation_jobs SET status = 'failed' WHERE conservation_id = $CONSERVATION_ID"
+    $MYSQL_CMD "INSERT INTO conservation_reports (conservation_id, report_text) VALUES ($CONSERVATION_ID, '$REPORT_TEXT')"
+    rm -f $FASTA_FILE $ALIGN_FILE
+    exit 1
 fi
 
-# 2. Run Plotcon analysis
-echo "Running EMBOSS Plotcon (window size: $WINDOW_SIZE)..." >> "$REPORT_FILE"
-plotcon -sequences "$ALIGN_FILE" -graph png -winsize "$WINDOW_SIZE" -goutfile "$RESULTS_DIR/plotcon" 2>&1 | tee -a "$REPORT_FILE"
+REPORT_TEXT+="\nAlignment completed successfully.\n"
 
-if [ -f "$RESULTS_DIR/plotcon.1.png" ]; then
-    mv "$RESULTS_DIR/plotcon.1.png" "$RESULTS_DIR/plotcon.png"
-    echo "Plotcon analysis completed. Graph saved as plotcon.png." >> "$REPORT_FILE"
-else
-    echo "WARNING: Plotcon did not generate expected output." >> "$REPORT_FILE"
-fi
-echo "" >> "$REPORT_FILE"
+# 3. Run Plotcon analysis and store results
+REPORT_TEXT+="\nRunning EMBOSS Plotcon (window size: $WINDOW_SIZE)...\n"
+plotcon_output=$(plotcon -sequences $ALIGN_FILE -graph none -winsize $WINDOW_SIZE -stdout 2>&1)
+REPORT_TEXT+="$plotcon_output\n"
 
-# 3. Run Shannon Entropy analysis
-echo "Running Shannon Entropy analysis..." >> "$REPORT_FILE"
-python3 - <<EOF | tee -a "$REPORT_FILE"
+# Parse plotcon output and store in database
+echo "$plotcon_output" | awk '/^[0-9]/ {print $1,$2}' | while read pos score; do
+    $MYSQL_CMD "INSERT INTO conservation_results (conservation_id, position, plotcon_score) VALUES ($CONSERVATION_ID, $pos, $score)"
+done
+
+# 4. Run Shannon Entropy analysis using Python
+python3 - <<EOF
+import sys
 import numpy as np
-import matplotlib.pyplot as plt
 from Bio import AlignIO
 from collections import Counter
-import json
+import MySQLdb
 
-def calculate_entropy(column):
-    counts = Counter(column)
-    total = len(column)
-    return -sum((count/total) * np.log2(count/total) for count in counts.values())
+# Database connection
+db = MySQLdb.connect(host="$DB_HOST", user="$DB_USER", passwd="$DB_PASS", db="$DB_NAME")
+cursor = db.cursor()
 
 # Read alignment
 alignment = AlignIO.read("$ALIGN_FILE", "clustal")
@@ -60,87 +86,75 @@ num_sequences = len(alignment)
 alignment_length = alignment.get_alignment_length()
 
 # Calculate entropy for each position
-entropy = []
+entropy_results = []
 for i in range(alignment_length):
     column = str(alignment[:, i]).replace('-', '')  # Ignore gaps
     if column:
-        entropy.append(calculate_entropy(column))
+        counts = Counter(column)
+        total = len(column)
+        entropy = -sum((count/total) * np.log2(count/total) for count in counts.values())
     else:
-        entropy.append(0)  # All gaps = 0 entropy
+        entropy = 0  # All gaps = 0 entropy
 
-# Generate statistics
-mean_entropy = np.mean(entropy)
-max_entropy = np.max(entropy)
-min_entropy = np.min(entropy)
-max_pos = np.argmax(entropy) + 1
-min_pos = np.argmin(entropy) + 1
+    # Store in database
+    cursor.execute("""
+        INSERT INTO conservation_results (conservation_id, position, entropy)
+        VALUES ($CONSERVATION_ID, %s, %s)
+        ON DUPLICATE KEY UPDATE entropy = VALUES(entropy)
+    """, (i+1, float(entropy)))
+    entropy_results.append(entropy)
 
-# Print report data
-print("\n=== Shannon Entropy Results ===")
-print(f"Number of sequences: {num_sequences}")
-print(f"Alignment length: {alignment_length} residues")
-print(f"Mean entropy: {mean_entropy:.3f} bits")
-print(f"Max entropy: {max_entropy:.3f} bits (position {max_pos})")
-print(f"Min entropy: {min_entropy:.3f} bits (position {min_pos})")
+# Calculate statistics
+mean_entropy = np.mean(entropy_results)
+max_entropy = np.max(entropy_results)
+min_entropy = np.min(entropy_results)
+max_pos = np.argmax(entropy_results) + 1
+min_pos = np.argmin(entropy_results) + 1
 
-# Save visualization files
-plt.figure(figsize=(12, 6))
-plt.plot(entropy, color='blue')
-plt.axhline(y=mean_entropy, color='r', linestyle='--', label='Mean entropy')
-plt.title('Shannon Entropy (gap positions excluded)')
-plt.xlabel('Position')
-plt.ylabel('Entropy (bits)')
-plt.legend()
-plt.tight_layout()
-plt.savefig("$RESULTS_DIR/entropy.png")
+# Store alignments in database
+for record in alignment:
+    cursor.execute("""
+        INSERT INTO conservation_alignments (conservation_id, ncbi_id, sequence)
+        VALUES ($CONSERVATION_ID, %s, %s)
+    """, (record.id, str(record.seq)))
 
-# Save JSON for interactive plot
-plot_data = {
-    "data": [{
-        "y": entropy,
-        "type": "line",
-        "name": "Entropy",
-        "line": {"color": "blue"}
-    }],
-    "layout": {
-        "title": "Shannon Entropy Analysis",
-        "xaxis": {"title": "Position"},
-        "yaxis": {"title": "Entropy (bits)"},
-        "shapes": [{
-            "type": "line",
-            "x0": 0,
-            "x1": len(entropy),
-            "y0": mean_entropy,
-            "y1": mean_entropy,
-            "line": {"color": "red", "dash": "dash"}
-        }]
-    }
-}
+# Generate report text
+report_text = """$REPORT_TEXT"""
 
-with open("$RESULTS_DIR/entropy.json", 'w') as f:
-    json.dump(plot_data, f)
+report_text += "\n=== Shannon Entropy Results ===\n"
+report_text += f"Number of sequences: {num_sequences}\n"
+report_text += f"Alignment length: {alignment_length} residues\n"
+report_text += f"Mean entropy: {mean_entropy:.3f} bits\n"
+report_text += f"Max entropy: {max_entropy:.3f} bits (position {max_pos})\n"
+report_text += f"Min entropy: {min_entropy:.3f} bits (position {min_pos})\n"
 
-# Generate simplified alignment view
-with open("$RESULTS_DIR/alignment.txt", 'w') as f:
-    for record in alignment:
-        f.write(f">{record.id}\n")
-        f.write(f"{str(record.seq)}\n\n")
-
-# Append conservation summary to report
-sorted_positions = sorted(enumerate(entropy), key=lambda x: x[1])
-print("\nTop 5 most conserved positions:")
+# Top conserved/variable positions
+sorted_positions = sorted(enumerate(entropy_results), key=lambda x: x[1])
+report_text += "\nTop 5 most conserved positions:\n"
 for pos, ent in sorted_positions[:5]:
-    print(f"Position {pos+1}: {ent:.3f} bits")
+    report_text += f"Position {pos+1}: {ent:.3f} bits\n"
 
-print("\nTop 5 most variable positions:")
+report_text += "\nTop 5 most variable positions:\n"
 for pos, ent in sorted(sorted_positions[-5:], key=lambda x: -x[1]):
-    print(f"Position {pos+1}: {ent:.3f} bits")
+    report_text += f"Position {pos+1}: {ent:.3f} bits\n"
+
+report_text += "\nAnalysis completed successfully.\n"
+
+# Store report in database
+cursor.execute("""
+    INSERT INTO conservation_reports
+    (conservation_id, report_text, mean_entropy, max_entropy, min_entropy, max_position, min_position)
+    VALUES ($CONSERVATION_ID, %s, %s, %s, %s, %s, %s)
+""", (report_text, float(mean_entropy), float(max_entropy), float(min_entropy), max_pos, min_pos))
+
+db.commit()
+db.close()
 EOF
 
-# Finalize report
-echo "" >> "$REPORT_FILE"
-echo "Analysis completed." >> "$REPORT_FILE"
-echo "Results saved in: $RESULTS_DIR" >> "$REPORT_FILE"
+# Clean up temporary files
+rm -f $FASTA_FILE $ALIGN_FILE
+
+# Update status to completed
+$MYSQL_CMD "UPDATE conservation_jobs SET status = 'completed' WHERE conservation_id = $CONSERVATION_ID"
 
 exit 0
-
