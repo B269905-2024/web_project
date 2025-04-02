@@ -1,82 +1,43 @@
 <?php
 session_start();
-require_once 'login.php';
 
-// Redirect if no job_id provided
-if (!isset($_GET['job_id'])) {
+if (!isset($_COOKIE['protein_search_session']) || empty($_GET['job_id']) || !is_numeric($_GET['job_id'])) {
     header("Location: home.php");
-    exit;
+    exit();
 }
 
-$job_id = $_GET['job_id'];
+$job_id = (int)$_GET['job_id'];
+
+require_once 'config.php';
 
 try {
-    // Connect to database
-    $pdo = new PDO("mysql:host=$hostname;dbname=$database", $username, $password);
+    $pdo = new PDO("mysql:host=$hostname;dbname=$database;charset=utf8", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
-    // Get current job data
-    $stmt = $pdo->prepare("SELECT * FROM searches WHERE job_id = ?");
+    $stmt = $pdo->prepare("SELECT j.* FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ? AND u.session_id = ?");
+    $stmt->execute([$job_id, $_COOKIE['protein_search_session']]);
+    $job = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$job) {
+        header("Location: home.php");
+        exit();
+    }
+    
+    $stmt = $pdo->prepare("SELECT * FROM sequences WHERE job_id = ?");
     $stmt->execute([$job_id]);
-    $row = $stmt->fetch();
+    $sequences = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    if (!$row) {
-        die("No job found with ID: " . htmlspecialchars($job_id));
-    }
-    
-    // Handle actions
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        if (isset($_POST['create_subset'])) {
-            // Create subset from current dataset (could be full or existing subset)
-            $current_content = $row['subset_sequences'] ?: $row['sequences'];
-            $num_sequences = substr_count($current_content, '>');
-            $num_requested = (int)$_POST['num_sequences'];
-            
-            if ($num_requested > 0 && $num_requested <= $num_sequences) {
-                // Extract subset
-                $subset_content = '';
-                $count = 0;
-                $lines = explode("\n", $current_content);
-                
-                foreach ($lines as $line) {
-                    if (str_starts_with(trim($line), '>')) {
-                        $count++;
-                        if ($count > $num_requested) break;
-                    }
-                    if ($count > 0) {
-                        $subset_content .= $line . "\n";
-                    }
-                }
-                
-                // Update database with new subset
-                $update_stmt = $pdo->prepare("UPDATE searches SET subset_sequences = ?, subset_size = ? WHERE job_id = ?");
-                $update_stmt->execute([trim($subset_content), $num_requested, $job_id]);
-                
-                // Refresh data
-                $stmt->execute([$job_id]);
-                $row = $stmt->fetch();
-                $success = "Created subset with $num_requested sequences";
-            } else {
-                $error = "Invalid number of sequences (1-$num_sequences)";
-            }
-        }
-    } elseif (isset($_GET['use_full'])) {
-        // Switch back to full dataset
-        $update_stmt = $pdo->prepare("UPDATE searches SET subset_sequences = NULL, subset_size = NULL WHERE job_id = ?");
-        $update_stmt->execute([$job_id]);
+    if (isset($_GET['download'])) {
+        header('Content-Type: text/plain');
+        header('Content-Disposition: attachment; filename="protein_sequences_'.$job_id.'.fasta"');
         
-        // Refresh data
-        $stmt->execute([$job_id]);
-        $row = $stmt->fetch();
-        $success = "Now using full dataset";
+        foreach ($sequences as $seq) {
+            echo ">{$seq['ncbi_id']} {$seq['description']}\n";
+            echo chunk_split($seq['sequence'], 80, "\n");
+        }
+        exit();
     }
     
-    // Determine current view
-    $is_subset = !empty($row['subset_sequences']);
-    $display_content = $is_subset ? $row['subset_sequences'] : $row['sequences'];
-    $display_count = $is_subset ? $row['subset_size'] : substr_count($row['sequences'], '>');
-    $total_sequences = substr_count($row['sequences'], '>');
-
 } catch (PDOException $e) {
     die("Database error: " . $e->getMessage());
 }
@@ -85,50 +46,43 @@ try {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Protein Job Results</title>
+    <title>Search Results</title>
 </head>
 <body>
-    <h1>Results for Job: <?= htmlspecialchars($job_id) ?></h1>
+    <div>
+        <a href="home.php">New Search</a>
+        <a href="past.php">Past Searches</a>
+    </div>
     
-    <p><strong>Protein Family:</strong> <?= htmlspecialchars($row['protein_family']) ?></p>
-    <p><strong>Taxonomic Group:</strong> <?= htmlspecialchars($row['taxonomic_group']) ?></p>
-    <p><strong>Total Sequences:</strong> <?= $total_sequences ?></p>
-    <p><strong>Currently Viewing:</strong> <?= $display_count ?> sequences (<?= $is_subset ? 'Subset' : 'Full Set' ?>)</p>
-
-    <?php if (isset($error)): ?>
-        <p style="color: red;"><?= htmlspecialchars($error) ?></p>
-    <?php elseif (isset($success)): ?>
-        <p style="color: green;"><?= htmlspecialchars($success) ?></p>
+    <div>
+        <h2>Results for: <?php echo htmlspecialchars($job['search_term']); ?> in <?php echo htmlspecialchars($job['taxon']); ?></h2>
+        <p>
+            Searched on: <?php echo date('M j, Y g:i a', strtotime($job['created_at'])); ?> | 
+            Sequences found: <?php echo count($sequences); ?> | 
+            Max results requested: <?php echo $job['max_results']; ?>
+        </p>
+    </div>
+    
+    <div>
+        <a href="results.php?job_id=<?php echo $job_id; ?>&download=1">Download FASTA</a>
+        <a href="past.php">Back to Past Searches</a>
+    </div>
+    
+    <?php if (!empty($sequences)): ?>
+        <?php foreach ($sequences as $seq): ?>
+            <div>
+                <div>><?php echo htmlspecialchars($seq['ncbi_id']); ?> <?php echo htmlspecialchars($seq['description']); ?></div>
+                <div>Length: <?php echo strlen($seq['sequence']); ?> amino acids</div>
+                <div><?php echo chunk_split($seq['sequence'], 80, "\n"); ?></div>
+            </div>
+        <?php endforeach; ?>
+        
+        <div>
+            <a href="results.php?job_id=<?php echo $job_id; ?>&download=1">Download FASTA</a>
+            <a href="past.php">Back to Past Searches</a>
+        </div>
+    <?php else: ?>
+        <p>No sequences were found for this search.</p>
     <?php endif; ?>
-
-    <h2>Dataset Options</h2>
-    
-    <form method="post">
-        <label>
-            Create subset (1-<?= $is_subset ? $row['subset_size'] : $total_sequences ?> sequences):
-            <input type="number" name="num_sequences" 
-                   min="1" max="<?= $is_subset ? $row['subset_size'] : $total_sequences ?>" 
-                   value="<?= min(10, $is_subset ? $row['subset_size'] : $total_sequences) ?>">
-        </label>
-        <input type="submit" name="create_subset" value="Create Subset">
-    </form>
-    
-    <?php if ($is_subset): ?>
-        <p><a href="?job_id=<?= htmlspecialchars($job_id) ?>&use_full=true">Use Full Dataset (<?= $total_sequences ?> sequences)</a></p>
-    <?php endif; ?>
-
-    <h2>FASTA Sequences</h2>
-    <pre><?= htmlspecialchars($display_content) ?></pre>
-
-    <h2>Analysis Options</h2>
-    <p>All analyses will use the <?= $is_subset ? 'subset' : 'full dataset' ?> shown above.</p>
-    
-    <ul>
-        <li><a href="conservation.php?job_id=<?= htmlspecialchars($job_id) ?>">Conservation Analysis</a></li>
-        <li><a href="motifs.php?job_id=<?= htmlspecialchars($job_id) ?>">Motif Analysis</a></li>
-        <li><a href="content.php?job_id=<?= htmlspecialchars($job_id) ?>">Content Analysis</a></li>
-    </ul>
-
-    <p><a href="home.php">Back to Search</a></p>
 </body>
 </html>
