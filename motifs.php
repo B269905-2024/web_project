@@ -1,287 +1,260 @@
 <?php
-require_once 'login.php';
+session_start();
 
-if (!isset($_GET['job_id'])) {
-    die("No job ID provided.");
+// Enhanced error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+ini_set('error_log', '/tmp/php_motifs_error.log');
+
+if (!isset($_COOKIE['protein_search_session']) || empty($_GET['job_id']) || !is_numeric($_GET['job_id'])) {
+    header("Location: home.php");
+    exit();
 }
 
-$job_id = $_GET['job_id'];
-$is_subset = isset($_GET['subset']) ? 1 : 0;
+$job_id = (int)$_GET['job_id'];
+
+require_once 'config.php';
 
 try {
-    // Connect to database
-    $pdo = new PDO("mysql:host=$hostname;dbname=$database", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo = new PDO("mysql:host=$hostname;dbname=$database;charset=utf8mb4", $username, $password, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ]);
 
-    // Get job details and sequences
-    $stmt = $pdo->prepare("SELECT protein_family, taxonomic_group,
-                          COALESCE(subset_sequences, sequences) AS sequences
-                          FROM searches WHERE job_id = ?");
+    // Verify user owns this job
+    $stmt = $pdo->prepare("SELECT j.*, u.user_id FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ? AND u.session_id = ?");
+    $stmt->execute([$job_id, $_COOKIE['protein_search_session']]);
+    $job = $stmt->fetch();
+
+    if (!$job) {
+        header("Location: home.php");
+        exit();
+    }
+
+    // Check for existing motif job
+    $stmt = $pdo->prepare("SELECT * FROM motif_jobs WHERE job_id = ?");
     $stmt->execute([$job_id]);
-    $row = $stmt->fetch();
+    $motif_job = $stmt->fetch();
 
-    if (!$row) {
-        die("No job found.");
-    }
+    if (!$motif_job) {
+        // Create new motif job
+        $stmt = $pdo->prepare("INSERT INTO motif_jobs (job_id) VALUES (?)");
+        $stmt->execute([$job_id]);
+        $motif_id = $pdo->lastInsertId();
 
-    // Count total sequences in the dataset
-    $total_sequences = substr_count($row['sequences'], '>');
-    $using_sequences = $is_subset ? substr_count($row['subset_sequences'], '>') : $total_sequences;
+        // Get sequences from database
+        $stmt = $pdo->prepare("SELECT sequence_id, ncbi_id, sequence FROM sequences WHERE job_id = ?");
+        $stmt->execute([$job_id]);
+        $sequences = $stmt->fetchAll();
+        $sequence_count = count($sequences);
 
-    // Check if motif analysis already exists
-    $analysis_stmt = $pdo->prepare("SELECT * FROM motif_analyses
-                                   WHERE job_id = ? AND is_subset = ?");
-    $analysis_stmt->execute([$job_id, $is_subset]);
-    $analysis = $analysis_stmt->fetch();
-
-    if (!$analysis) {
-        // Create temporary FASTA file for processing
-        $fasta_content = $row['sequences'];
-        $temp_fasta = tempnam(sys_get_temp_dir(), 'fasta_');
-        file_put_contents($temp_fasta, $fasta_content);
-
-        // Create results directory
-        $results_dir = sys_get_temp_dir() . "/{$job_id}_motifs_" . ($is_subset ? "subset" : "full");
-        if (!is_dir($results_dir)) {
-            mkdir($results_dir, 0777, true);
+        if (empty($sequences)) {
+            $stmt = $pdo->prepare("DELETE FROM motif_jobs WHERE motif_id = ?");
+            $stmt->execute([$motif_id]);
+            header("Location: results.php?job_id=$job_id");
+            exit();
         }
 
-        // Run motif analysis
-        $output = shell_exec("/bin/bash run_motifs.sh " .
-                           escapeshellarg($temp_fasta) . " " .
-                           escapeshellarg($results_dir) . " 2>&1");
+        // Create individual FASTA files for debugging
+        $fasta_files = [];
+        $fasta_content = '';
+        foreach ($sequences as $seq) {
+            $individual_file = tempnam(sys_get_temp_dir(), 'motif_seq_');
+            file_put_contents($individual_file, ">{$seq['ncbi_id']}\n{$seq['sequence']}\n");
+            $fasta_files[] = [
+                'file' => $individual_file,
+                'ncbi_id' => $seq['ncbi_id'],
+                'size' => filesize($individual_file)
+            ];
+            $fasta_content .= ">{$seq['ncbi_id']}\n{$seq['sequence']}\n";
+        }
 
-        // Process and store results in database
-        if (file_exists("$results_dir/patmatmotifs_results.txt")) {
-            $motif_results = file_get_contents("$results_dir/patmatmotifs_results.txt");
+        // Create combined FASTA file
+        $combined_file = tempnam(sys_get_temp_dir(), 'motif_combined_');
+        file_put_contents($combined_file, $fasta_content);
 
-            // First create the analysis record
-            $insert_stmt = $pdo->prepare("INSERT INTO motif_analyses
-                                        (job_id, is_subset, raw_results, created_at)
-                                        VALUES (?, ?, ?, NOW())");
-            $insert_stmt->execute([$job_id, $is_subset, $motif_results]);
-            $analysis_id = $pdo->lastInsertId();
+        // Execute patmatmotifs on combined file
+        $output = [];
+        $return_var = 0;
+        $command = "/usr/bin/patmatmotifs -sequence $combined_file -full Y -auto 2>&1";
+        exec($command, $output, $return_var);
+        
+        $output_text = implode("\n", $output);
 
-            // Parse and store individual motifs
-            $pattern = '/Sequence: (.+?)\s+from: (\d+)\s+to: (\d+).*?HitCount: (\d+).*?Full: (.+?)Prune: (.+?)Data_file: (.+?)(?=Sequence|\Z)/ms';
-            preg_match_all($pattern, $motif_results, $sequence_blocks, PREG_SET_ORDER);
+        // Store debug info
+        $_SESSION['motif_debug'] = [
+            'sequences_count' => $sequence_count,
+            'individual_files' => $fasta_files,
+            'combined_file' => [
+                'path' => $combined_file,
+                'size' => filesize($combined_file),
+                'content_sample' => substr($fasta_content, 0, 500) . (strlen($fasta_content) > 500 ? '...' : '')
+            ],
+            'command' => $command,
+            'output' => $output_text,
+            'return_code' => $return_var
+        ];
 
-            $sequences_with_motifs = 0;
-            $total_motifs = 0;
-
-            foreach ($sequence_blocks as $block) {
-                $sequence_id = trim($block[1]);
-                $start_pos = $block[2];
-                $end_pos = $block[3];
-                $hit_count = $block[4];
-
-                // Count sequences with motifs
-                if ($hit_count > 0) {
-                    $sequences_with_motifs++;
-                }
-
-                // Parse individual motifs
-                $motif_pattern = '/Length = (\d+)\s+Start = position (\d+) of sequence\s+End = position (\d+) of sequence\s+Motif = (.+?)\s+([A-Za-z\s]+)\n\s+([| \n]+)/';
-                preg_match_all($motif_pattern, $block[0], $motifs, PREG_SET_ORDER);
-
-                foreach ($motifs as $motif) {
-                    $length = $motif[1];
-                    $motif_start = $motif[2];
-                    $motif_end = $motif[3];
-                    $motif_name = trim($motif[4]);
-                    $sequence_part = trim($motif[5]);
-                    $visual_guide = trim($motif[6]);
-
-                    // Generate enhanced visual guide
-                    $enhanced_guide = '';
-                    $chars = str_split($visual_guide);
-                    $pos = $motif_start;
-                    foreach ($chars as $char) {
-                        if ($char === '|') {
-                            $enhanced_guide .= '|' . $pos;
-                            $pos = $motif_end;
-                        } else {
-                            $enhanced_guide .= $char;
-                        }
-                    }
-
-                    // Store motif
-                    $stmt = $pdo->prepare("INSERT INTO motif_results
-                        (analysis_id, job_id, sequence_id, motif_name, length,
-                         start_pos, end_pos, sequence_part, visual_guide, enhanced_guide)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([
-                        $analysis_id, $job_id, $sequence_id, $motif_name, $length,
-                        $motif_start, $motif_end, $sequence_part, $visual_guide, $enhanced_guide
-                    ]);
-                    
-                    $total_motifs++;
-                }
+        // Clean up files
+        foreach ($fasta_files as $file) {
+            if (file_exists($file['file'])) {
+                unlink($file['file']);
             }
-
-            // Update analysis with summary statistics
-            $update_stmt = $pdo->prepare("UPDATE motif_analyses 
-                                        SET sequences_analyzed = ?, 
-                                            sequences_with_motifs = ?,
-                                            total_motifs_found = ?
-                                        WHERE id = ?");
-            $update_stmt->execute([
-                count($sequence_blocks),
-                $sequences_with_motifs,
-                $total_motifs,
-                $analysis_id
-            ]);
+        }
+        if (file_exists($combined_file)) {
+            unlink($combined_file);
         }
 
-        // Clean up
-        unlink($temp_fasta);
-
-        // Refresh analysis data
-        $analysis_stmt->execute([$job_id, $is_subset]);
-        $analysis = $analysis_stmt->fetch();
-    }
-
-    // Handle report generation
-    if (isset($_GET['generate_report'])) {
-        header('Content-Type: text/plain');
-        header('Content-Disposition: attachment; filename="motif_report_' . $job_id . '.txt"');
-
-        echo "Motif Analysis Report\n";
-        echo "====================\n\n";
-        echo "Job ID: $job_id\n";
-        echo "Protein Family: " . $row['protein_family'] . "\n";
-        echo "Taxonomic Group: " . $row['taxonomic_group'] . "\n";
-        echo "Date: " . date('Y-m-d H:i:s') . "\n";
-        if ($is_subset) {
-            echo "Subset: First " . ($_GET['subset'] ?? '?') . " sequences\n";
+        if ($return_var !== 0) {
+            throw new Exception("patmatmotifs failed with code $return_var");
         }
-        echo "\n";
 
-        // Get analysis statistics
-        $stats_stmt = $pdo->prepare("SELECT sequences_analyzed, sequences_with_motifs, total_motifs_found 
-                                   FROM motif_analyses WHERE id = ?");
-        $stats_stmt->execute([$analysis['id']]);
-        $stats = $stats_stmt->fetch();
+        if (empty($output_text)) {
+            throw new Exception("patmatmotifs returned empty output");
+        }
 
-        echo "Analysis Statistics\n";
-        echo "-------------------\n";
-        echo "Sequences analyzed: " . $stats['sequences_analyzed'] . "\n";
-        echo "Sequences with motifs: " . $stats['sequences_with_motifs'] . "\n";
-        echo "Total motifs found: " . $stats['total_motifs_found'] . "\n\n";
-
-        // Get all sequences with motifs
-        $sequences = $pdo->prepare("
-            SELECT DISTINCT sequence_id
-            FROM motif_results
-            WHERE job_id = ? AND analysis_id = ?
-            ORDER BY sequence_id
-        ");
-        $sequences->execute([$job_id, $analysis['id']]);
-        $sequences = $sequences->fetchAll();
-
-        if (!empty($sequences)) {
-            $current_seq = null;
-            foreach ($sequences as $seq) {
-                $current_seq = $seq['sequence_id'];
-                echo "\nSequence: $current_seq\n";
-                echo str_repeat("-", 50) . "\n";
-
-                // Get motifs for this sequence
-                $motifs = $pdo->prepare("
-                    SELECT * FROM motif_results
-                    WHERE job_id = ? AND analysis_id = ? AND sequence_id = ?
-                    ORDER BY start_pos
-                ");
-                $motifs->execute([$job_id, $analysis['id'], $current_seq]);
-                $motifs = $motifs->fetchAll();
-
-                foreach ($motifs as $motif) {
-                    echo "\nMotif: " . $motif['motif_name'] . "\n";
-                    echo "Length: " . $motif['length'] . " aa\n";
-                    echo "Positions: " . $motif['start_pos'] . "-" . $motif['end_pos'] . "\n";
-                    echo "Sequence: " . $motif['sequence_part'] . "\n";
-                    echo "Visualization:\n" . $motif['enhanced_guide'] . "\n";
-                }
+        // Parse results
+        $current_seq = '';
+        $motif_count = 0;
+        
+        foreach ($output as $line) {
+            if (preg_match('/^Sequence: (.+?)\s+from:/', $line, $matches)) {
+                $current_seq = $matches[1];
             }
-        } else {
-            echo "No motifs found in database.\n";
+            elseif (preg_match('/^Hit: (\S+)\s+(PS\d+);(.*?);(\d+)-(\d+); Score: ([\d.]+); P-value: ([\d.]+)/', $line, $matches)) {
+                $stmt = $pdo->prepare("INSERT INTO motif_results 
+                    (motif_id, sequence_id, motif_name, motif_id_code, description, start_pos, end_pos, score, p_value)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $motif_id,
+                    $current_seq,
+                    trim($matches[1]),
+                    $matches[2],
+                    trim($matches[3]),
+                    $matches[4],
+                    $matches[5],
+                    $matches[6],
+                    $matches[7]
+                ]);
+                $motif_count++;
+            }
         }
-        exit;
+        
+        // Generate report
+        $report_text = "Motif Analysis Report\n===========================\n\n";
+        $report_text .= "Job ID: $job_id\n";
+        $report_text .= "Search Term: " . $job['search_term'] . "\n";
+        $report_text .= "Taxonomic Group: " . $job['taxon'] . "\n";
+        $report_text .= "Date: " . date('Y-m-d H:i:s') . "\n\n";
+        $report_text .= "Sequences analyzed: $sequence_count\n";
+        $report_text .= "Total motifs found: $motif_count\n";
+        
+        $stmt = $pdo->prepare("INSERT INTO motif_reports (motif_id, report_text) VALUES (?, ?)");
+        $stmt->execute([$motif_id, $report_text]);
     }
 
-} catch (PDOException $e) {
-    die("Database error: " . $e->getMessage());
+    // Get analysis results
+    $stmt = $pdo->prepare("
+        SELECT mr.*, s.ncbi_id 
+        FROM motif_results mr
+        JOIN sequences s ON mr.sequence_id = s.sequence_id
+        WHERE mr.motif_id = (SELECT motif_id FROM motif_jobs WHERE job_id = ?)
+        ORDER BY mr.sequence_id, mr.start_pos
+    ");
+    $stmt->execute([$job_id]);
+    $results = $stmt->fetchAll();
+
+} catch (Exception $e) {
+    error_log("Motif analysis error: " . $e->getMessage());
 }
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Protein Motif Search</title>
+    <title>Motif Analysis</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; margin: 0; padding: 20px; color: #333; background-color: #f9f9f9; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+        .debug-info { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-top: 20px; }
+        pre { white-space: pre-wrap; background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #ddd; overflow-x: auto; max-height: 400px; }
+        .file-info { margin-bottom: 15px; }
+        .file-info h4 { margin-bottom: 5px; }
+        .nav-links { margin-bottom: 20px; }
+        .nav-links a { margin-right: 15px; text-decoration: none; color: #3498db; }
+        .no-results { background: #fdecea; padding: 20px; border-radius: 8px; }
+    </style>
 </head>
 <body>
-    <h1>Motif Search Results for Job: <?= htmlspecialchars($job_id) ?></h1>
+    <div class="container">
+        <div class="nav-links">
+            <a href="home.php">New Search</a>
+            <a href="past.php">Past Searches</a>
+            <a href="results.php?job_id=<?= $job_id ?>">Back to Results</a>
+        </div>
 
-    <?php if ($is_subset): ?>
-        <p><strong>Using subset:</strong> First <?= htmlspecialchars($_GET['subset'] ?? '?') ?> sequences</p>
-    <?php endif; ?>
+        <h1>Motif Analysis: <?= htmlspecialchars($job['search_term']) ?></h1>
+        
+        <div class="summary-section">
+            <h2>Analysis Summary</h2>
+            <p><strong>Job ID:</strong> <?= $job_id ?></p>
+            <p><strong>Taxonomic Group:</strong> <?= htmlspecialchars($job['taxon']) ?></p>
+            <p><strong>Sequences Analyzed:</strong> <?= $_SESSION['motif_debug']['sequences_count'] ?? '0' ?></p>
+            <p><strong>Total Motifs Found:</strong> <?= count($results ?? []) ?></p>
+        </div>
 
-    <?php if (!empty($analysis)): ?>
-        <?php
-        // Get analysis statistics
-        $stats_stmt = $pdo->prepare("SELECT sequences_analyzed, sequences_with_motifs, total_motifs_found 
-                                   FROM motif_analyses WHERE id = ?");
-        $stats_stmt->execute([$analysis['id']]);
-        $stats = $stats_stmt->fetch();
-
-        // Get all sequences with motifs
-        $sequences = $pdo->prepare("
-            SELECT DISTINCT sequence_id
-            FROM motif_results
-            WHERE job_id = ? AND analysis_id = ?
-            ORDER BY sequence_id
-        ");
-        $sequences->execute([$job_id, $analysis['id']]);
-        $sequences = $sequences->fetchAll();
-        ?>
-
-        <h2>Analysis Summary</h2>
-        <p>Analyzed <?= $stats['sequences_analyzed'] ?> sequences out of <?= $using_sequences ?></p>
-        <p>Found motifs in <?= $stats['sequences_with_motifs'] ?> sequences</p>
-        <p>Total motifs found: <?= $stats['total_motifs_found'] ?></p>
-
-        <?php if (!empty($sequences)): ?>
-            <?php foreach ($sequences as $seq): ?>
-                <?php
-                $motifs = $pdo->prepare("
-                    SELECT * FROM motif_results
-                    WHERE job_id = ? AND analysis_id = ? AND sequence_id = ?
-                    ORDER BY start_pos
-                ");
-                $motifs->execute([$job_id, $analysis['id'], $seq['sequence_id']]);
-                $motifs = $motifs->fetchAll();
-                ?>
-
-                <h3>Sequence: <?= htmlspecialchars($seq['sequence_id']) ?></h3>
-                <p>Found <?= count($motifs) ?> motifs:</p>
-
-                <?php foreach ($motifs as $motif): ?>
-                    <div>
-                        <h4><?= htmlspecialchars($motif['motif_name']) ?> Motif</h4>
-                        <p>Length: <?= $motif['length'] ?> aa</p>
-                        <p>Positions: <?= $motif['start_pos'] ?>-<?= $motif['end_pos'] ?></p>
-                        <pre><?= htmlspecialchars($motif['sequence_part']) ?></pre>
-                        <pre><?= htmlspecialchars($motif['enhanced_guide']) ?></pre>
-                    </div>
-                <?php endforeach; ?>
-            <?php endforeach; ?>
-
-            <p><a href="?job_id=<?= $job_id ?>&subset=<?= $is_subset ? $_GET['subset'] : '' ?>&generate_report=1">Generate TXT Report</a></p>
+        <?php if (!empty($results)): ?>
+            <!-- Results display -->
         <?php else: ?>
-            <p>No motifs were found in the database for this analysis.</p>
+            <div class="no-results">
+                <h3>No Motifs Found</h3>
+                
+                <?php if (isset($_SESSION['motif_debug'])): ?>
+                <div class="debug-info">
+                    <h4>Detailed Debug Information</h4>
+                    
+                    <div class="file-info">
+                        <h4>Sequence Files Processed (<?= count($_SESSION['motif_debug']['individual_files'] ?? []) ?>)</h4>
+                        <ul>
+                            <?php foreach ($_SESSION['motif_debug']['individual_files'] as $file): ?>
+                                <li><?= htmlspecialchars($file['ncbi_id']) ?> (<?= $file['size'] ?> bytes)</li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                    
+                    <div class="file-info">
+                        <h4>Combined FASTA File</h4>
+                        <p><strong>Size:</strong> <?= $_SESSION['motif_debug']['combined_file']['size'] ?? '0' ?> bytes</p>
+                        <p><strong>Sample:</strong></p>
+                        <pre><?= htmlspecialchars($_SESSION['motif_debug']['combined_file']['content_sample'] ?? 'No content') ?></pre>
+                    </div>
+                    
+                    <div class="command-info">
+                        <h4>Execution Details</h4>
+                        <p><strong>Command:</strong> <code><?= htmlspecialchars($_SESSION['motif_debug']['command'] ?? 'Not executed') ?></code></p>
+                        <p><strong>Return Code:</strong> <?= $_SESSION['motif_debug']['return_code'] ?? 'N/A' ?></p>
+                        <p><strong>Output:</strong></p>
+                        <pre><?= htmlspecialchars($_SESSION['motif_debug']['output'] ?? 'No output') ?></pre>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <div class="troubleshooting">
+                    <h4>Next Steps:</h4>
+                    <ol>
+                        <li>Verify each sequence file contains valid protein data</li>
+                        <li>Check the combined FASTA format matches expected format</li>
+                        <li>Test patmatmotifs manually with the sample sequences</li>
+                        <li>Review server error logs for additional details</li>
+                    </ol>
+                </div>
+            </div>
         <?php endif; ?>
-    <?php else: ?>
-        <p>No motif analysis was found for this job.</p>
-    <?php endif; ?>
+    </div>
 </body>
 </html>
+<?php
+// Clear debug info after displaying
+unset($_SESSION['motif_debug']);
+?>
