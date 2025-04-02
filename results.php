@@ -112,7 +112,8 @@ try {
 
         <div class="action-buttons">
             <a href="results.php?job_id=<?php echo $job_id; ?>&download=1" class="action-btn">Download FASTA</a>
-            <a href="conservation.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Run Conservation Analysis</a>
+	    <a href="conservation.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Run Conservation Analysis</a>
+ 	    <a href="motifs.php?job_id=<?php echo $job_id; ?>" class="action-btn motif">Run Motif Analysis</a>
             <a href="past.php" class="action-btn secondary">Back to Past Searches</a>
         </div>
     <?php else: ?>
