@@ -103,7 +103,8 @@ try {
         <a href="past.php">Past Searches</a>
         <a href="example.php">Example Analysis</a>
         <a href="about.php">About</a>
-        <a href="help.php">Help</a>
+	<a href="help.php">Help</a>
+	<a href="credits.php">Credits</a>
     </div>
 
     <div>
