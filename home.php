@@ -101,7 +101,6 @@ try {
             <p>By continuing, you agree to our use of cookies. Do you consent?</p>
             <div class="cookie-buttons">
                 <button id="acceptCookies" class="cookie-btn accept-btn">Accept Cookies</button>
-                <button id="rejectCookies" class="cookie-btn reject-btn">Reject</button>
             </div>
         </div>
     </div>
