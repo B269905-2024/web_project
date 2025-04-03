@@ -199,7 +199,8 @@ ob_start();
         <div>
             <a href="home.php">New Search</a> | 
             <a href="past.php">Past Searches</a> | 
-            <a href="results.php?job_id=<?= $job_id ?>">Back to Results</a>
+            <a href="results.php?job_id=<?= $job_id ?>">Back to Results</a> |
+            <button onclick="downloadReport()">Download Full Report</button>
         </div>
 
         <h1>Motif Analysis: <?= htmlspecialchars($job['search_term'] ?? 'Unknown') ?></h1>
@@ -286,6 +287,64 @@ ob_start();
                 element.style.display = 'none';
                 toggle.textContent = '▶ Show analysis details';
             }
+        }
+
+        function downloadReport() {
+            // Create report content
+            let reportContent = `Motif Analysis Report\n`;
+            reportContent += `========================\n\n`;
+            reportContent += `Job Information:\n`;
+            reportContent += `- Job ID: ${<?= $job_id ?>}\n`;
+            reportContent += `- Search Term: ${'<?= htmlspecialchars($job['search_term'] ?? 'Unknown') ?>'}\n`;
+            reportContent += `- Taxonomic Group: ${'<?= htmlspecialchars($job['taxon'] ?? 'Unknown') ?>'}\n`;
+            reportContent += `- Sequences Analyzed: ${<?= $sequence_count ?>}\n`;
+            reportContent += `- Total Motifs Found: ${<?= count($all_motifs) ?>}\n`;
+            reportContent += `- Unique Motif Types: ${<?= count(array_unique(array_column($all_motifs, 'motif_name'))) ?>}\n\n`;
+
+            // Add sequence details
+            reportContent += `Sequence Details:\n`;
+            reportContent += `========================\n\n`;
+            
+            <?php foreach ($sequences as $seq): 
+                $seq_motifs = array_filter($all_motifs, function($m) use ($seq) {
+                    return $m['sequence_id'] == $seq['sequence_id'];
+                });
+                $report = $sequence_reports[$seq['ncbi_id']] ?? ['hitcount' => 0];
+            ?>
+                reportContent += `Sequence: ${'<?= htmlspecialchars($seq['ncbi_id']) ?>'}\n`;
+                reportContent += `Motifs Found: ${<?= !empty($seq_motifs) ? count($seq_motifs) : 0 ?>}\n\n`;
+                
+                <?php if (!empty($seq_motifs)): ?>
+                    <?php foreach ($seq_motifs as $motif): 
+                        $start = max(0, $motif['start_pos'] - 10);
+                        $end = min(strlen($seq['sequence']), $motif['end_pos'] + 10);
+                        $segment = substr($seq['sequence'], $start, $end - $start);
+                        $highlight_start = $motif['start_pos'] - $start - 1;
+                        $highlight_length = $motif['end_pos'] - $motif['start_pos'] + 1;
+                    ?>
+                        reportContent += `  Motif: ${'<?= htmlspecialchars($motif['motif_name']) ?>'}\n`;
+                        reportContent += `  Positions: ${<?= $motif['start_pos'] ?>} to ${<?= $motif['end_pos'] ?>}\n`;
+                        reportContent += `  Context: ${'<?= htmlspecialchars($segment) ?>'}\n`;
+                        reportContent += `           ${'<?= str_repeat(' ', $highlight_start) . str_repeat('^', $highlight_length) ?>'}\n\n`;
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    reportContent += `  No known motifs detected in this sequence\n\n`;
+                <?php endif; ?>
+            <?php endforeach; ?>
+
+            // Add timestamp
+            reportContent += `Report generated on: ${new Date().toLocaleString()}\n`;
+
+            // Create download link
+            const blob = new Blob([reportContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `motif_report_job_${<?= $job_id ?>}_${new Date().toISOString().slice(0,10)}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
     </script>
 </body>
