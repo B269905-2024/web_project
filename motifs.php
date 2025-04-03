@@ -56,11 +56,11 @@ try {
         $motif_id = $pdo->lastInsertId();
 
         $output_dir = sys_get_temp_dir();
-        
+
         foreach ($sequences as $seq) {
             $sequence_motifs = [];
             $sequence_output = '';
-            
+
             // Create temporary FASTA file for this sequence
             $fasta_content = ">{$seq['ncbi_id']}\n{$seq['sequence']}\n";
             $fasta_file = tempnam($output_dir, 'motif_');
@@ -90,7 +90,11 @@ try {
             if (file_exists($output_file)) {
                 $output_content = file_get_contents($output_file);
                 $sequence_output = $output_content;
-                
+
+                // Store report in database
+                $stmt = $pdo->prepare("INSERT INTO motif_reports (motif_id, report_text) VALUES (?, ?)");
+                $stmt->execute([$motif_id, $output_content]);
+
                 // Parse the output for this sequence
                 $lines = explode("\n", $output_content);
                 $current_hitcount = 0;
@@ -112,13 +116,13 @@ try {
                         $motif_block['end_pos'] = (int)$matches[1];
                         $motif_block['sequence'] = $seq['ncbi_id'];
                         $motif_block['sequence_id'] = $seq['sequence_id'];
-                        
+
                         // Only store complete motif blocks
                         if ($in_motif && !empty($motif_block['motif_name'])) {
                             $sequence_motifs[] = $motif_block;
-                            
+
                             // Store in database
-                            $stmt = $pdo->prepare("INSERT INTO motif_results 
+                            $stmt = $pdo->prepare("INSERT INTO motif_results
                                 (motif_id, sequence_id, motif_name, start_pos, end_pos)
                                 VALUES (?, ?, ?, ?, ?)");
                             $stmt->execute([
@@ -133,13 +137,12 @@ try {
                         $in_motif = false;
                     }
                 }
-                
+
                 $all_motifs = array_merge($all_motifs, $sequence_motifs);
-                
+
                 // Create sequence report
                 $sequence_reports[$seq['ncbi_id']] = [
                     'motifs' => $sequence_motifs,
-                    'output' => $sequence_output,
                     'hitcount' => $current_hitcount
                 ];
             }
@@ -147,7 +150,7 @@ try {
     } elseif ($motif_job) {
         // Get existing results from database
         $stmt = $pdo->prepare("
-            SELECT mr.*, s.ncbi_id as sequence 
+            SELECT mr.*, s.ncbi_id as sequence
             FROM motif_results mr
             JOIN sequences s ON mr.sequence_id = s.sequence_id
             WHERE mr.motif_id = ?
@@ -155,7 +158,7 @@ try {
         ");
         $stmt->execute([$motif_job['motif_id']]);
         $db_motifs = $stmt->fetchAll();
-        
+
         foreach ($db_motifs as $db_motif) {
             $all_motifs[] = [
                 'sequence' => $db_motif['sequence'],
@@ -165,16 +168,15 @@ try {
                 'end_pos' => $db_motif['end_pos']
             ];
         }
-        
+
         // Group motifs by sequence for reporting
         foreach ($sequences as $seq) {
             $sequence_motifs = array_filter($all_motifs, function($m) use ($seq) {
                 return $m['sequence_id'] == $seq['sequence_id'];
             });
-            
+
             $sequence_reports[$seq['ncbi_id']] = [
                 'motifs' => $sequence_motifs,
-                'output' => '',
                 'hitcount' => count($sequence_motifs)
             ];
         }
@@ -198,20 +200,31 @@ ob_start();
         .sequence { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; }
         .motif { background-color: #f5f5f5; padding: 10px; margin: 10px 0; }
         .highlight { background-color: #ffeb3b; padding: 2px; }
-        pre { background-color: #f5f5f5; padding: 10px; overflow-x: auto; }
-        .toggle { color: blue; cursor: pointer; }
+        .download-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
     <div>
         <div>
-            <a href="home.php">New Search</a> | 
-            <a href="past.php">Past Searches</a> | 
+            <a href="home.php">New Search</a> |
+            <a href="past.php">Past Searches</a> |
             <a href="results.php?job_id=<?= $job_id ?>">Back to Results</a>
         </div>
 
         <h1>Motif Analysis: <?= htmlspecialchars($job['search_term'] ?? 'Unknown') ?></h1>
-        
+
         <?php if (isset($_SESSION['error'])): ?>
             <div style="color: red; margin-bottom: 20px;">
                 <?= htmlspecialchars($_SESSION['error']) ?>
@@ -227,11 +240,12 @@ ob_start();
             <?php if (!empty($all_motifs)): ?>
                 <p><strong>Total Motifs Found:</strong> <?= count($all_motifs) ?></p>
                 <p><strong>Unique Motif Types:</strong> <?= count(array_unique(array_column($all_motifs, 'motif_name'))) ?></p>
+                <a href="download_motifs.php?job_id=<?= $job_id ?>" class="download-btn">Download All Motif Results</a>
             <?php endif; ?>
         </div>
 
         <div>
-            <?php foreach ($sequences as $seq): 
+            <?php foreach ($sequences as $seq):
                 $seq_motifs = array_filter($all_motifs, function($m) use ($seq) {
                     return $m['sequence_id'] == $seq['sequence_id'];
                 });
@@ -239,12 +253,15 @@ ob_start();
                 $report = $sequence_reports[$seq['ncbi_id']] ?? ['hitcount' => 0];
             ?>
                 <div class="sequence">
-                    <h3><?= htmlspecialchars($seq['ncbi_id']) ?> 
+                    <h3><?= htmlspecialchars($seq['ncbi_id']) ?>
                         <span style="font-weight:normal">(<?= $has_motifs ? count($seq_motifs) . ' motifs' : 'No motifs' ?>)</span>
+                        <?php if ($has_motifs): ?>
+                            <a href="download_motifs.php?job_id=<?= $job_id ?>&sequence_id=<?= $seq['sequence_id'] ?>" class="download-btn">Download Details</a>
+                        <?php endif; ?>
                     </h3>
-                    
+
                     <?php if ($has_motifs): ?>
-                        <?php foreach ($seq_motifs as $motif): 
+                        <?php foreach ($seq_motifs as $motif):
                             $start = max(0, $motif['start_pos'] - 10);
                             $end = min(strlen($seq['sequence']), $motif['end_pos'] + 10);
                             $segment = substr($seq['sequence'], $start, $end - $start);
@@ -268,34 +285,10 @@ ob_start();
                     <?php else: ?>
                         <p>No known motifs detected in this sequence</p>
                     <?php endif; ?>
-
-                    <?php if (!empty($report['output'])): ?>
-                        <div>
-                            <span class="toggle" onclick="toggleOutput('output-<?= $seq['sequence_id'] ?>')">
-                                ▶ Show analysis details
-                            </span>
-                            <pre id="output-<?= $seq['sequence_id'] ?>" style="display:none"><?= htmlspecialchars($report['output']) ?></pre>
-                        </div>
-                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
     </div>
-
-    <script>
-        function toggleOutput(id) {
-            const element = document.getElementById(id);
-            const toggle = element.previousElementSibling;
-            
-            if (element.style.display === 'none') {
-                element.style.display = 'block';
-                toggle.textContent = '▼ Hide analysis details';
-            } else {
-                element.style.display = 'none';
-                toggle.textContent = '▶ Show analysis details';
-            }
-        }
-    </script>
 </body>
 </html>
 <?php ob_end_flush(); ?>
