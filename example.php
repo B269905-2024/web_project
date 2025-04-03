@@ -1,7 +1,7 @@
 <?php
-// Set infinite session cookie at the very top
+// Set infinite session cookie
 setcookie('protein_search_session', 'permanent_session', [
-    'expires' => time() + (10 * 365 * 24 * 60 * 60), // 10 years (practically infinite)
+    'expires' => time() + (10 * 365 * 24 * 60 * 60),
     'path' => '/',
     'domain' => $_SERVER['HTTP_HOST'],
     'secure' => true,
@@ -9,13 +9,12 @@ setcookie('protein_search_session', 'permanent_session', [
     'samesite' => 'Lax'
 ]);
 
-// Configure session to last essentially forever
-ini_set('session.gc_maxlifetime', 60*60*24*365); // 1 year
-session_set_cookie_params(60*60*24*365); // 1 year
+// Configure session
+ini_set('session.gc_maxlifetime', 60*60*24*365);
+session_set_cookie_params(60*60*24*365);
 session_start();
 
-$job_id = 90; // Fixed job ID for this example page
-
+$job_id = 90; // Fixed example job ID
 require_once 'config.php';
 
 try {
@@ -24,32 +23,7 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
 
-    // Bypass normal session verification for this special case
-    $stmt = $pdo->prepare("SELECT j.* FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ? AND u.session_id = 'permanent_session'");
-    $stmt->execute([$job_id]);
-    $job = $stmt->fetch();
-
-    if (!$job) {
-        // Create the permanent session if it doesn't exist
-        $pdo->beginTransaction();
-
-        // Create permanent user if not exists
-        $stmt = $pdo->prepare("INSERT IGNORE INTO users (session_id, created_at) VALUES ('permanent_session', NOW())");
-        $stmt->execute();
-
-        // Assign job to permanent user
-        $stmt = $pdo->prepare("UPDATE jobs SET user_id = (SELECT user_id FROM users WHERE session_id = 'permanent_session') WHERE job_id = ?");
-        $stmt->execute([$job_id]);
-
-        $pdo->commit();
-
-        // Refetch the job
-        $stmt = $pdo->prepare("SELECT j.* FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ?");
-        $stmt->execute([$job_id]);
-        $job = $stmt->fetch();
-    }
-
-    // Get basic job info
+    // Get job info
     $stmt = $pdo->prepare("SELECT * FROM jobs WHERE job_id = ?");
     $stmt->execute([$job_id]);
     $job_info = $stmt->fetch();
@@ -65,49 +39,17 @@ try {
     $stmt->execute([$job_id]);
     $conservation_job = $stmt->fetch();
 
-    $conservation_results = [];
-    $conservation_report = [];
-    $conservation_alignments = [];
-
     if ($conservation_job) {
         $stmt = $pdo->prepare("SELECT position, entropy, plotcon_score FROM conservation_results WHERE conservation_id = ? ORDER BY position");
         $stmt->execute([$conservation_job['conservation_id']]);
         $conservation_results = $stmt->fetchAll();
 
-        $stmt = $pdo->prepare("SELECT * FROM conservation_reports WHERE conservation_id = ?");
-        $stmt->execute([$conservation_job['conservation_id']]);
-        $conservation_report = $stmt->fetch();
-
-        $stmt = $pdo->prepare("SELECT ncbi_id, sequence FROM conservation_alignments WHERE conservation_id = ?");
+        $stmt = $pdo->prepare("SELECT * FROM conservation_alignments WHERE conservation_id = ?");
         $stmt->execute([$conservation_job['conservation_id']]);
         $conservation_alignments = $stmt->fetchAll();
     }
 
-    // Get motif analysis
-    $stmt = $pdo->prepare("SELECT * FROM motif_jobs WHERE job_id = ?");
-    $stmt->execute([$job_id]);
-    $motif_job = $stmt->fetch();
-
-    $motif_results = [];
-    $motif_reports = [];
-
-    if ($motif_job) {
-        $stmt = $pdo->prepare("
-            SELECT mr.*, s.ncbi_id as sequence
-            FROM motif_results mr
-            JOIN sequences s ON mr.sequence_id = s.sequence_id
-            WHERE mr.motif_id = ?
-            ORDER BY mr.sequence_id, mr.start_pos
-        ");
-        $stmt->execute([$motif_job['motif_id']]);
-        $motif_results = $stmt->fetchAll();
-
-        $stmt = $pdo->prepare("SELECT * FROM motif_reports WHERE motif_id = ?");
-        $stmt->execute([$motif_job['motif_id']]);
-        $motif_reports = $stmt->fetchAll();
-    }
-
-    // Prepare data for visualization
+    // Prepare visualization data
     $entropy_data = [];
     $plotcon_data = [];
     $aa_data = [];
@@ -118,20 +60,12 @@ try {
                 'y' => array_column($conservation_results, 'entropy'),
                 'type' => 'line',
                 'name' => 'Entropy',
-                'line' => ['color' => 'blue']
+                'line' => ['color' => '#667292']
             ]],
             'layout' => [
-                'title' => 'Shannon Entropy Analysis',
+                'title' => 'Shannon Entropy',
                 'xaxis' => ['title' => 'Position'],
-                'yaxis' => ['title' => 'Entropy (bits)'],
-                'shapes' => [[
-                    'type' => 'line',
-                    'x0' => 0,
-                    'x1' => count($conservation_results),
-                    'y0' => $conservation_report['mean_entropy'],
-                    'y1' => $conservation_report['mean_entropy'],
-                    'line' => ['color' => 'red', 'dash' => 'dash']
-                ]]
+                'yaxis' => ['title' => 'Entropy (bits)']
             ]
         ];
 
@@ -141,40 +75,29 @@ try {
                     'y' => array_column($conservation_results, 'plotcon_score'),
                     'type' => 'line',
                     'name' => 'Conservation Score',
-                    'line' => ['color' => 'green']
+                    'line' => ['color' => '#8d9db6']
                 ]],
                 'layout' => [
-                    'title' => 'Plotcon Conservation Analysis',
+                    'title' => 'Plotcon Conservation',
                     'xaxis' => ['title' => 'Position'],
-                    'yaxis' => ['title' => 'Conservation Score']
+                    'yaxis' => ['title' => 'Score']
                 ]
             ];
         }
     }
 
-    // Prepare amino acid content data
+    // Prepare amino acid data
     $amino_acids = str_split('ACDEFGHIKLMNPQRSTVWY');
-    $aa_data = [];
-
     foreach ($sequences as $seq) {
-        $sequence = strtoupper($seq['sequence']);
-        $total = strlen($sequence);
         $counts = array_fill_keys($amino_acids, 0);
-
-        foreach (str_split($sequence) as $aa) {
-            if (isset($counts[$aa])) {
-                $counts[$aa]++;
-            }
+        foreach (str_split(strtoupper($seq['sequence'])) as $aa) {
+            if (isset($counts[$aa])) $counts[$aa]++;
         }
-
-        $percentages = [];
+        $total = strlen($seq['sequence']);
         foreach ($counts as $aa => $count) {
-            $percentages[$aa] = $total > 0 ? ($count / $total) * 100 : 0;
+            $aa_data[$seq['ncbi_id']][$aa] = $total > 0 ? ($count / $total) * 100 : 0;
         }
-
-        $aa_data[$seq['ncbi_id']] = $percentages;
     }
-
     $aa_data_json = json_encode($aa_data);
 
 } catch (PDOException $e) {
@@ -183,155 +106,248 @@ try {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Permanent Analysis Report - Job #<?= $job_id ?></title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Example Protein Analysis</title>
+    <link rel="icon" href="images/logo.png" type="image/png">
+    <link rel="stylesheet" href="general.css">
+    <link rel="stylesheet" href="example.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-        .scrollable-box {
-            max-height: 300px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            font-family: monospace;
-            background: #f8f9fa;
-            white-space: pre;
-        }
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .nav { margin-bottom: 20px; }
-        .nav a { margin-right: 10px; }
-        .section { margin-bottom: 30px; }
-        .plot-container { height: 400px; margin: 20px 0; }
-        select { padding: 5px; margin: 10px 0; }
-    </style>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 </head>
-<body>
-    <div class="nav">
-        <a href="home.php">New Search</a>
-        <a href="past.php">Past Searches</a>
-        <a href="results.php?job_id=<?= $job_id ?>">Back to Results</a>
-    </div>
+<body class="dark-mode">
+    <!-- Dark Mode Toggle -->
+    <button id="darkModeToggle" class="dark-mode-toggle">
+        <span class="toggle-icon"></span>
+    </button>
 
-    <div>
-        <h1>Analysis Report - Job #<?= $job_id ?></h1>
-        <p><strong>Search Term:</strong> <?= htmlspecialchars($job_info['search_term']) ?> | 
-           <strong>Taxon:</strong> <?= htmlspecialchars($job_info['taxon']) ?></p>
-        <p><strong>Sequences:</strong> <?= $sequence_count ?> | 
-           <strong>Date:</strong> <?= date('M j, Y g:i a', strtotime($job_info['created_at'])) ?></p>
-    </div>
+    <!-- Animated Background -->
+    <div id="particles-js"></div>
 
-    <div class="section">
-        <h2>Conservation Analysis</h2>
-        <?php if ($conservation_job): ?>
-            <div class="plot-container" id="entropyPlot"></div>
-            <?php if ($plotcon_data): ?>
-                <div class="plot-container" id="plotconPlot"></div>
-            <?php endif; ?>
-
-            <h3>Aligned Sequences</h3>
-            <div class="scrollable-box">
-                <?php foreach ($conservation_alignments as $aln): ?>
-                    ><?= htmlspecialchars($aln['ncbi_id']) ?><br>
-                    <?= chunk_split($aln['sequence'], 80, "<br>") ?><br><br>
-                <?php endforeach; ?>
+    <!-- Navigation -->
+    <nav class="top-bar glass">
+        <div class="logo-nav-container">
+            <a href="home.php" class="logo-tab">
+                <img src="images/full_logo.png" alt="Protein Analysis Suite" class="logo">
+                <span>Protein Analysis Suite</span>
+            </a>
+            <div class="nav-links">
+                <a href="home.php" class="nav-link"><span>New Search</span></a>
+                <a href="past.php" class="nav-link"><span>Past Searches</span></a>
+                <a href="example.php" class="nav-link active"><span>Example Analysis</span></a>
+                <a href="about.php" class="nav-link"><span>About</span></a>
             </div>
-        <?php else: ?>
-            <p>No conservation analysis performed</p>
-        <?php endif; ?>
-    </div>
+        </div>
+    </nav>
 
-    <?php if ($motif_job): ?>
-    <div class="section">
-        <h2>Motif Analysis</h2>
-        <p><strong>Total Motifs Found:</strong> <?= count($motif_results) ?></p>
-        
-        <?php
-        $motifs_by_sequence = [];
-        foreach ($motif_results as $motif) {
-            $motifs_by_sequence[$motif['sequence']][] = $motif;
-        }
-        ?>
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="example-container glass">
+            <h1>Example Protein Analysis</h1>
+            
+            <!-- Horizontal Job Info -->
+            <div class="job-info-horizontal">
+                <div class="info-pair">
+                    <span class="info-label">Search Term:</span>
+                    <span class="info-value"><?= htmlspecialchars($job_info['search_term']) ?></span>
+                </div>
+                <div class="info-pair">
+                    <span class="info-label">Taxon:</span>
+                    <span class="info-value"><?= htmlspecialchars($job_info['taxon']) ?></span>
+                </div>
+                <div class="info-pair">
+                    <span class="info-label">Sequences:</span>
+                    <span class="info-value"><?= $sequence_count ?></span>
+                </div>
+                <div class="info-pair">
+                    <span class="info-label">Date:</span>
+                    <span class="info-value"><?= date('M j, Y g:i a', strtotime($job_info['created_at'])) ?></span>
+                </div>
+            </div>
 
-        <?php foreach ($motifs_by_sequence as $seq_id => $seq_motifs): ?>
-            <div>
-                <h3><?= htmlspecialchars($seq_id) ?> (<?= count($seq_motifs) ?> motifs)</h3>
-                <?php
-                $sequence = '';
-                foreach ($sequences as $seq) {
-                    if ($seq['ncbi_id'] == $seq_id) {
-                        $sequence = $seq['sequence'];
-                        break;
-                    }
-                }
-                ?>
-
-                <?php foreach ($seq_motifs as $motif): ?>
-                    <div>
-                        <p><strong><?= htmlspecialchars($motif['motif_name']) ?></strong>
-                        (Positions: <?= $motif['start_pos'] ?>-<?= $motif['end_pos'] ?>)</p>
-                        <?php
-                        $start = max(0, $motif['start_pos'] - 10);
-                        $end = min(strlen($sequence), $motif['end_pos'] + 10);
-                        $segment = substr($sequence, $start, $end - $start);
-                        $highlight_start = $motif['start_pos'] - $start - 1;
-                        $highlight_length = $motif['end_pos'] - $motif['start_pos'] + 1;
-                        ?>
-                        <div style="font-family: monospace;">
-                            <?= substr($segment, 0, $highlight_start) ?>
-                            <span style="background-color: #ffeb3b;"><?= substr($segment, $highlight_start, $highlight_length) ?></span>
-                            <?= substr($segment, $highlight_start + $highlight_length) ?>
+            <!-- Conservation Analysis -->
+            <section class="analysis-section">
+                <h2>Conservation Analysis</h2>
+                <div class="plots-row">
+                    <?php if ($conservation_job): ?>
+                        <div class="plot-wrapper">
+                            <div id="entropyPlot"></div>
+                        </div>
+                        <?php if ($plotcon_data): ?>
+                            <div class="plot-wrapper">
+                                <div id="plotconPlot"></div>
+                            </div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+                
+                <?php if ($conservation_alignments): ?>
+                    <div class="alignment-container glass">
+                        <h3>Aligned Sequences</h3>
+                        <div class="scrollable-box">
+                            <?php foreach ($conservation_alignments as $aln): ?>
+                                <span class="sequence-header">><?= htmlspecialchars($aln['ncbi_id']) ?></span><br>
+                                <?= chunk_split($aln['sequence'], 80, "<br>") ?><br><br>
+                            <?php endforeach; ?>
                         </div>
                     </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endforeach; ?>
-    </div>
-    <?php endif; ?>
+                <?php endif; ?>
+            </section>
 
-    <div class="section">
-        <h2>Amino Acid Content Analysis</h2>
-        <select id="sequenceSelector">
-            <?php foreach (array_keys($aa_data) as $id): ?>
-                <option value="<?= htmlspecialchars($id) ?>"><?= htmlspecialchars($id) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <div class="plot-container" id="aaChart"></div>
-    </div>
+            <!-- Amino Acid Analysis -->
+            <section class="analysis-section">
+                <h2>Amino Acid Composition</h2>
+                <div class="plot-wrapper">
+                    <div id="aaChart"></div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer glass">
+        <div class="footer-content">
+            <p>Created for Introduction to Website and Database Design @ University of Edinburgh</p>
+            <a href="https://github.com/B269905-2024/web_project" target="_blank" class="github-link">
+                <i class="fab fa-github"></i> View on GitHub
+            </a>
+        </div>
+    </footer>
 
     <script>
+        // Initialize particles
+        particlesJS("particles-js", {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: "#8d9db6" },
+                shape: { type: "circle" },
+                opacity: { value: 0.5, random: true },
+                size: { value: 3, random: true },
+                line_linked: { 
+                    enable: true, 
+                    distance: 150, 
+                    color: "#8d9db6", 
+                    opacity: 0.2, 
+                    width: 1 
+                },
+                move: { enable: true, speed: 2, direction: "none", random: true, straight: false, out_mode: "out" }
+            },
+            interactivity: {
+                detect_on: "canvas",
+                events: {
+                    onhover: { enable: true, mode: "grab" },
+                    onclick: { enable: true, mode: "push" }
+                }
+            }
+        });
+
+        // Dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const body = document.body;
+        
+        darkModeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', body.classList.contains('dark-mode') ? 'enabled' : 'disabled');
+            updatePlotStyles();
+        });
+
+        // Initialize dark mode
+        if (!localStorage.getItem('darkMode') || localStorage.getItem('darkMode') === 'enabled') {
+            body.classList.add('dark-mode');
+        } else {
+            body.classList.remove('dark-mode');
+        }
+
+        // Update plot styles for theme
+        function updatePlotStyles() {
+            const isDarkMode = body.classList.contains('dark-mode');
+            const textColor = isDarkMode ? '#e1e8f0' : '#222222';
+            const bgColor = 'rgba(0,0,0,0)';
+            const gridColor = isDarkMode ? 'rgba(225, 232, 240, 0.2)' : 'rgba(34, 34, 34, 0.2)';
+            
+            const layout = {
+                plot_bgcolor: bgColor,
+                paper_bgcolor: bgColor,
+                font: { color: textColor },
+                xaxis: { gridcolor: gridColor, linecolor: textColor, tickcolor: textColor },
+                yaxis: { gridcolor: gridColor, linecolor: textColor, tickcolor: textColor }
+            };
+
+            <?php if ($entropy_data): ?>
+                Plotly.relayout('entropyPlot', layout);
+            <?php endif; ?>
+            
+            <?php if ($plotcon_data): ?>
+                Plotly.relayout('plotconPlot', layout);
+            <?php endif; ?>
+            
+            if (typeof aaChart !== 'undefined') {
+                Plotly.relayout('aaChart', layout);
+            }
+        }
+
+        // Initialize plots
         <?php if ($entropy_data): ?>
-            var entropyData = <?= json_encode($entropy_data) ?>;
-            Plotly.newPlot("entropyPlot", entropyData.data, entropyData.layout);
+            Plotly.newPlot("entropyPlot", <?= json_encode($entropy_data['data']) ?>, <?= json_encode($entropy_data['layout']) ?>);
         <?php endif; ?>
 
         <?php if ($plotcon_data): ?>
-            var plotconData = <?= json_encode($plotcon_data) ?>;
-            Plotly.newPlot("plotconPlot", plotconData.data, plotconData.layout);
+            Plotly.newPlot("plotconPlot", <?= json_encode($plotcon_data['data']) ?>, <?= json_encode($plotcon_data['layout']) ?>);
         <?php endif; ?>
 
+        // Amino acid chart
         const aaData = <?= $aa_data_json ?>;
-        
-        function updateChart(selectedId) {
+        let aaChart;
+
+        function updateAAChart(selectedId) {
             const data = [{
                 x: Object.keys(aaData[selectedId]),
                 y: Object.values(aaData[selectedId]),
                 type: 'bar',
-                marker: { color: '#007BFF' }
+                marker: { color: body.classList.contains('dark-mode') ? '#8d9db6' : '#667292' }
             }];
 
             const layout = {
-                title: `Amino Acid Composition: ${selectedId}`,
+                title: `Amino Acids: ${selectedId}`,
                 xaxis: { title: 'Amino Acid' },
-                yaxis: { title: 'Percentage (%)' }
+                yaxis: { title: 'Percentage (%)' },
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)'
             };
 
-            Plotly.react('aaChart', data, layout);
+            if (aaChart) {
+                Plotly.react('aaChart', data, layout);
+            } else {
+                aaChart = Plotly.newPlot('aaChart', data, layout);
+            }
+            updatePlotStyles();
         }
 
-        updateChart(document.getElementById('sequenceSelector').value);
-        
-        document.getElementById('sequenceSelector').addEventListener('change', function(e) {
-            updateChart(e.target.value);
+        // Initialize AA chart
+        updateAAChart(Object.keys(aaData)[0]);
+
+        // Sequence selector
+        const sequenceSelector = document.createElement('select');
+        sequenceSelector.className = 'sequence-selector glass';
+        Object.keys(aaData).forEach(id => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = id;
+            sequenceSelector.appendChild(option);
+        });
+        sequenceSelector.addEventListener('change', (e) => {
+            updateAAChart(e.target.value);
+        });
+        document.querySelector('#aaChart').before(sequenceSelector);
+
+        // Responsive plots
+        window.addEventListener('resize', () => {
+            <?php if ($entropy_data): ?> Plotly.Plots.resize('entropyPlot'); <?php endif; ?>
+            <?php if ($plotcon_data): ?> Plotly.Plots.resize('plotconPlot'); <?php endif; ?>
+            if (typeof aaChart !== 'undefined') Plotly.Plots.resize('aaChart');
         });
     </script>
 </body>

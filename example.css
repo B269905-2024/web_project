@@ -1,0 +1,430 @@
+/* Example Analysis Specific Styles */
+@import url('general.css');
+
+/* Main Container */
+.example-container {
+    width: 100%;
+    max-width: 1200px;
+    border-radius: 1rem;
+    padding: 2.5rem;
+    margin: 0 auto;
+    background: var(--glass);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+.example-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    position: relative;
+}
+
+.example-header h1 {
+    color: var(--primary);
+    font-size: var(--text-xxl);
+    margin-bottom: 0.5rem;
+    position: relative;
+    display: inline-block;
+}
+
+.example-header h1::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 150px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    border-radius: 4px;
+}
+
+.subtitle {
+    color: var(--text);
+    opacity: 0.8;
+    font-size: var(--text-base);
+    margin-bottom: 1.5rem;
+}
+
+/* Job Info Card */
+.job-info-card {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    padding: 1.5rem;
+    margin: 1.5rem auto;
+    max-width: 800px;
+    border-radius: 0.8rem;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.info-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.info-label {
+    font-size: var(--text-xs);
+    color: var(--text);
+    opacity: 0.7;
+}
+
+.info-value {
+    font-size: var(--text-sm);
+    color: var(--text);
+    font-weight: 500;
+}
+
+/* Analysis Sections */
+.analysis-section {
+    margin: 2.5rem 0;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.section-title {
+    color: var(--primary);
+    font-size: var(--text-xl);
+    margin-bottom: 1.5rem;
+    position: relative;
+    padding-bottom: 0.5rem;
+}
+
+.section-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    height: 3px;
+    background: var(--secondary);
+    border-radius: 3px;
+}
+
+.subsection-title {
+    color: var(--primary);
+    font-size: var(--text-lg);
+    margin-bottom: 1rem;
+}
+
+/* Plot Containers */
+.plot-container {
+    height: 400px;
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border-radius: 0.8rem;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Alignment Container */
+.alignment-container {
+    padding: 1.5rem;
+    border-radius: 0.8rem;
+    margin-top: 1.5rem;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.scrollable-box {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 1rem;
+    font-family: monospace;
+    background: rgba(0,0,0,0.2);
+    border-radius: 0.5rem;
+    color: var(--text);
+    line-height: 1.6;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.sequence-header {
+    color: var(--secondary);
+    font-weight: bold;
+}
+
+/* Motif Analysis */
+.motif-summary {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.summary-label {
+    font-size: var(--text-base);
+    color: var(--text);
+}
+
+.summary-value {
+    font-size: var(--text-lg);
+    color: var(--primary);
+    font-weight: bold;
+}
+
+.sequence-card {
+    padding: 1.5rem;
+    border-radius: 0.8rem;
+    margin-bottom: 1.5rem;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.sequence-title {
+    color: var(--primary);
+    font-size: var(--text-lg);
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.motif-count {
+    font-size: var(--text-sm);
+    color: var(--text);
+    opacity: 0.8;
+    margin-left: 0.8rem;
+}
+
+.motif-list {
+    margin-top: 1.5rem;
+}
+
+.motif-item {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px dashed rgba(255,255,255,0.1);
+}
+
+.motif-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.motif-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.8rem;
+    align-items: center;
+}
+
+.motif-name {
+    font-weight: bold;
+    color: var(--secondary);
+    font-size: var(--text-base);
+}
+
+.motif-positions {
+    font-size: var(--text-sm);
+    color: var(--text);
+    opacity: 0.8;
+}
+
+.sequence-preview {
+    font-family: monospace;
+    font-size: var(--text-sm);
+    color: var(--text);
+    line-height: 1.6;
+    word-break: break-all;
+}
+
+.highlighted-motif {
+    background-color: rgba(255, 235, 59, 0.3);
+    color: var(--text);
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+/* Amino Acid Analysis */
+.aa-analysis-container {
+    padding: 1.5rem;
+    border-radius: 0.8rem;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.sequence-selector {
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.sequence-selector label {
+    font-size: var(--text-sm);
+    color: var(--text);
+}
+
+.sequence-selector select {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--accent);
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    transition: all 0.3s ease;
+}
+
+.sequence-selector select:focus {
+    outline: none;
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 2px rgba(102, 114, 146, 0.3);
+}
+
+/* No Analysis State */
+.no-analysis {
+    padding: 2rem;
+    text-align: center;
+    border-radius: 0.8rem;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.no-analysis p {
+    margin: 0;
+    color: var(--text);
+    opacity: 0.8;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .example-container {
+        padding: 1.5rem;
+    }
+    
+    .job-info-card {
+        grid-template-columns: 1fr;
+    }
+    
+    .motif-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.3rem;
+    }
+    
+    .sequence-selector {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .example-header h1 {
+        font-size: var(--text-xl);
+    }
+    
+    .section-title {
+        font-size: var(--text-lg);
+    }
+    
+    .plot-container {
+        height: 300px;
+    }
+}
+/* Centered Job Info */
+.job-info-centered {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 1.5rem 0;
+    padding: 0;
+}
+
+.job-info-centered .info-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    justify-content: center;
+}
+
+.job-info-centered .info-label {
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+.job-info-centered .info-value {
+    font-weight: 600;
+}
+
+/* Remove overlapping containers */
+.example-header {
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.plot-container {
+    margin-top: 2rem;
+}
+
+.alignment-container {
+    margin-top: 2rem;
+}
+/* Horizontal Job Info */
+.job-info-horizontal {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.job-info-horizontal .info-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.job-info-horizontal .info-label {
+    font-weight: 500;
+    opacity: 0.9;
+    white-space: nowrap;
+}
+
+.job-info-horizontal .info-value {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Plots Container */
+.plots-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin: 1rem 0;
+}
+
+.plots-container .plot-container {
+    flex: 1;
+    min-width: 400px;
+    height: 400px;
+    margin: 0;
+}
+
+/* Remove containers below graphs */
+.plot-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+}
+
+/* Adjust section spacing */
+.analysis-section {
+    margin: 2rem 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.alignment-container {
+    margin-top: 2rem;
+}
