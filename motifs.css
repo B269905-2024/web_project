@@ -1,0 +1,272 @@
+/* Motif Analysis Specific Styles */
+@import url('general.css');
+
+/* Main Container */
+.motif-analysis-container {
+    width: 100%;
+    max-width: 1200px;
+    border-radius: 1rem;
+    padding: 2.5rem;
+    margin: 0 auto;
+}
+
+.motif-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+.motif-header h1 {
+    color: var(--primary);
+    margin: 0;
+    font-size: var(--text-xl);
+    position: relative;
+    padding-bottom: 0.5rem;
+}
+
+.motif-header h1::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100px;
+    height: 3px;
+    background: var(--primary);
+    border-radius: 3px;
+}
+
+.motif-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.back-btn {
+    background: var(--accent);
+}
+
+.download-btn {
+    background: var(--primary);
+}
+
+/* Analysis Summary */
+.analysis-summary {
+    padding: 1.5rem;
+    border-radius: 0.8rem;
+    margin-bottom: 2rem;
+}
+
+.analysis-summary h2 {
+    color: var(--primary);
+    margin-bottom: 1.5rem;
+    font-size: var(--text-lg);
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.summary-label {
+    font-weight: 600;
+    color: var(--primary);
+    font-size: var(--text-sm);
+}
+
+.summary-value {
+    color: var(--text);
+    font-size: var(--text-base);
+}
+
+/* Sequence Results */
+.sequence-results {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.sequence-card {
+    padding: 1.5rem;
+    border-radius: 0.8rem;
+}
+
+.sequence-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.sequence-header h3 {
+    margin: 0;
+    color: var(--primary);
+    font-size: var(--text-base);
+}
+
+.motif-count {
+    font-weight: 600;
+    padding: 0.3rem 0.8rem;
+    border-radius: 1rem;
+    font-size: var(--text-sm);
+}
+
+.has-motifs {
+    background-color: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+}
+
+.no-motifs {
+    background-color: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+}
+
+/* Motifs List */
+.motifs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.motif-item {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid var(--primary);
+}
+
+.motif-name {
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+    font-size: var(--text-sm);
+}
+
+.motif-positions {
+    color: var(--text);
+    opacity: 0.8;
+    font-size: var(--text-sm);
+    margin-bottom: 0.8rem;
+}
+
+.motif-context {
+    font-family: monospace;
+    font-size: var(--text-sm);
+    white-space: pre;
+    margin: 0;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 0.3rem;
+    overflow-x: auto;
+}
+
+.motif-output {
+    font-family: monospace;
+    font-size: var(--text-sm);
+    white-space: pre;
+    margin: 0;
+    padding: 0;
+    line-height: 1.2;
+    background: transparent;
+    border: none;
+    color: var(--text);
+}
+
+.highlight {
+    color: var(--secondary);
+    font-weight: bold;
+    background-color: rgba(141, 157, 182, 0.2);
+}
+
+.no-motifs-message {
+    color: var(--text);
+    opacity: 0.7;
+    font-style: italic;
+    text-align: center;
+    padding: 1rem;
+}
+
+/* Analysis Details */
+.analysis-details {
+    margin-top: 1.5rem;
+}
+
+.toggle-output {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    padding: 0.5rem 0;
+}
+
+.toggle-output:hover {
+    text-decoration: underline;
+}
+
+.output-content {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-family: monospace;
+    font-size: var(--text-xs);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 0.5rem;
+}
+
+/* Error Message */
+.error-message {
+    background-color: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+    font-size: var(--text-sm);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .motif-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .motif-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .motif-analysis-container {
+        padding: 1.5rem;
+    }
+
+    .motif-header h1 {
+        font-size: var(--text-lg);
+    }
+
+    .sequence-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
