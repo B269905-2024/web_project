@@ -79,99 +79,247 @@ try {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Protein Sequence Search</title>
-    <style>
-        .nav-links {
-            margin-bottom: 20px;
-        }
-        .nav-links a {
-            margin-right: 15px;
-            text-decoration: none;
-            color: #0366d6;
-        }
-        .nav-links a:hover {
-            text-decoration: underline;
-        }
-        form {
-            max-width: 600px;
-            margin: 20px auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        form div {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input[type="text"],
-        input[type="number"] {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-        }
-        button[type="submit"] {
-            background-color: #28a745;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        button[type="submit"]:hover {
-            background-color: #218838;
-        }
-        .example-searches {
-            margin-top: 30px;
-            padding: 15px;
-            background-color: #f6f8fa;
-            border-radius: 5px;
-        }
-    </style>
+    <link rel="icon" href="images/logo.png" type="image/png">
+    <link rel="stylesheet" href="home.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ngl@2.0.0-dev.38/dist/ngl.js"></script>
 </head>
-<body>
-    <div class="nav-links">
-        <a href="home.php">New Search</a>
-        <a href="past.php">Past Searches</a>
-        <a href="example.php">Example Analysis</a>
-        <a href="about.php">About</a>
-	<a href="help.php">Help</a>
-	<a href="credits.php">Credits</a>
+<body class="dark-mode">
+    <!-- Cookie Consent Modal -->
+    <div id="cookieConsent" class="cookie-consent">
+        <div class="cookie-overlay"></div>
+        <div class="cookie-content glass">
+            <span class="cookie-icon">🍪</span>
+            <h3>We use cookies!</h3>
+            <p>This website uses cookies to remember your previous protein searches and make your experience smoother.</p>
+            <p>By continuing, you agree to our use of cookies. Do you consent?</p>
+            <div class="cookie-buttons">
+                <button id="acceptCookies" class="cookie-btn accept-btn">Accept Cookies</button>
+                <button id="rejectCookies" class="cookie-btn reject-btn">Reject</button>
+            </div>
+        </div>
     </div>
 
-    <h1>Protein Sequence Search</h1>
+    <!-- Dark Mode Toggle -->
+    <button id="darkModeToggle" class="dark-mode-toggle">
+        <span class="toggle-icon"></span>
+    </button>
 
-    <form method="post">
-        <div>
-            <label for="search_term">Protein or Gene Name:</label>
-            <input type="text" id="search_term" name="search_term" required placeholder="e.g., glucose-6-phosphatase, ABC transporters">
+    <!-- Animated Background -->
+    <div id="particles-js"></div>
+
+    <!-- Top Navigation Bar -->
+    <nav class="top-bar glass">
+        <div class="logo-nav-container">
+            <a href="home.php" class="logo-tab">
+                <img src="images/full_logo.png" alt="Protein Analysis Suite" class="logo">
+                <span>Protein Analysis Suite</span>
+            </a>
+
+            <div class="nav-links">
+                <a href="home.php" class="nav-link active"><span>New Search</span></a>
+                <a href="past.php" class="nav-link"><span>Past Searches</span></a>
+                <a href="example.php" class="nav-link"><span>Example Analysis</span></a>
+                <a href="about.php" class="nav-link"><span>About</span></a>
+                <a href="help.php" class="nav-link"><span>Help</span></a>
+                <a href="credits.php" class="nav-link"><span>Credits</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="form-container glass">
+            <h1>Protein Sequence Search</h1>
+
+            <form method="post" class="analysis-form">
+                <div class="form-group">
+                    <label for="search_term">Protein or Gene Name:</label>
+                    <input type="text" id="search_term" name="search_term" required placeholder="e.g., glucose-6-phosphatase, ABC transporters">
+                </div>
+
+                <div class="form-group">
+                    <label for="taxon">Taxonomic Group:</label>
+                    <input type="text" id="taxon" name="taxon" required placeholder="e.g., Aves, Mammalia, Rodentia">
+                </div>
+
+                <div class="form-group">
+                    <label for="max_results">Maximum Results (1-100):</label>
+                    <input type="number" id="max_results" name="max_results" min="1" max="100" value="10" required>
+                </div>
+
+                <button type="submit" class="submit-btn">Search</button>
+            </form>
+
+            <div class="tools-section">
+                <h2>Example Searches</h2>
+                <div class="analysis-cards">
+                    <div class="card">
+                        <div class="card-front">
+                            <h3>Glucose-6-phosphatase</h3>
+                            <p>in Aves (birds)</p>
+                        </div>
+                        <div class="card-back">
+                            <p>Search for glucose-6-phosphatase enzymes in avian species to study metabolic adaptations in birds.</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-front">
+                            <h3>ABC transporters</h3>
+                            <p>in Mammalia (mammals)</p>
+                        </div>
+                        <div class="card-back">
+                            <p>Explore ABC transporter proteins across mammalian species to understand membrane transport mechanisms.</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-front">
+                            <h3>Kinases</h3>
+                            <p>in Rodentia (rodents)</p>
+                        </div>
+                        <div class="card-back">
+                            <p>Investigate kinase proteins in rodents to study signal transduction pathways in these model organisms.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-searches">
+                <h3>Search Suggestions:</h3>
+                <ul>
+                    <li>Glucose-6-phosphatase in Aves (birds)</li>
+                    <li>ABC transporters in Mammalia (mammals)</li>
+                    <li>Kinases in Rodentia (rodents)</li>
+                </ul>
+            </div>
         </div>
 
-        <div>
-            <label for="taxon">Taxonomic Group:</label>
-            <input type="text" id="taxon" name="taxon" required placeholder="e.g., Aves, Mammalia, Rodentia">
+        <div class="viewer-container glass">
+            <div class="viewer-header">
+                <h2>Protein Structure Visualization</h2>
+                <p class="viewer-description">ABC Transporter (PDB: 6NNG | Chain F) - This is the first sequence you would find when searching for ABC transporters in Aves. The structure shown is an example of the type of results you can expect from your searches.</p>
+            </div>
+            <div id="protein-viewer"></div>
+            <div class="reference">
+                <p>Kumar, G., Wang, Y., Li, W., & White, S. W. (2019). Tubulin-RB3_SLD-TTL in complex with compound DJ95 [Protein Data Bank entry 6NNG]. RCSB Protein Data Bank. https://doi.org/10.2210/pdb6nng/pdb<br>
+                (Original work published July 10, 2019)</p>
+            </div>
         </div>
+    </main>
 
-        <div>
-            <label for="max_results">Maximum Results (1-100):</label>
-            <input type="number" id="max_results" name="max_results" min="1" max="100" value="10" required>
+    <!-- Footer -->
+    <footer class="footer glass">
+        <div class="footer-content">
+            <p>Created as part of the postgraduate course Introduction to Website and Database Design @ the University of Edinburgh, this website reflects coursework submitted for academic assessment.</p>
+            <a href="https://github.com/B269905-2024/web_project" target="_blank" class="github-link">
+                <i class="fab fa-github"></i> View the source code on GitHub
+            </a>
         </div>
+    </footer>
 
-        <button type="submit">Search</button>
-    </form>
+    <script>
+        // [Previous JavaScript remains the same]
+        // Cookie Consent Functionality
+        const cookieConsent = document.getElementById('cookieConsent');
+        const acceptCookies = document.getElementById('acceptCookies');
+        const rejectCookies = document.getElementById('rejectCookies');
+        const body = document.body;
 
-    <div class="example-searches">
-        <h3>Example Searches:</h3>
-        <ul>
-            <li>Glucose-6-phosphatase in Aves (birds)</li>
-            <li>ABC transporters in Mammalia (mammals)</li>
-            <li>Kinases in Rodentia (rodents)</li>
-        </ul>
-    </div>
+        // Check if cookies are accepted
+        if (!localStorage.getItem('cookiesAccepted')) {
+            document.getElementById('cookieConsent').style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // Prevent scrolling
+        }
+
+        // Handle cookie acceptance
+        acceptCookies.addEventListener('click', function() {
+            localStorage.setItem('cookiesAccepted', 'true');
+            hideCookieConsent();
+        });
+
+        // Handle cookie rejection
+        rejectCookies.addEventListener('click', function() {
+            localStorage.setItem('cookiesRejected', 'true');
+            hideCookieConsent();
+        });
+
+        function hideCookieConsent() {
+            document.getElementById('cookieConsent').style.display = 'none';
+            document.body.style.overflow = 'auto'; // Re-enable scrolling
+        }
+
+        // Initialize particles.js background
+        particlesJS("particles-js", {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: "#8d9db6" },
+                shape: { type: "circle" },
+                opacity: { value: 0.5, random: true },
+                size: { value: 3, random: true },
+                line_linked: { enable: true, distance: 150, color: "#8d9db6", opacity: 0.2, width: 1 },
+                move: { enable: true, speed: 2, direction: "none", random: true, straight: false, out_mode: "out" }
+            },
+            interactivity: {
+                detect_on: "canvas",
+                events: {
+                    onhover: { enable: true, mode: "grab" },
+                    onclick: { enable: true, mode: "push" }
+                }
+            }
+        });
+
+        // Initialize NGL Viewer with 6NNG structure
+        const stage = new NGL.Stage("protein-viewer", {
+            backgroundColor: body.classList.contains('dark-mode') ? "black" : "white"
+        });
+        let component;
+
+        stage.loadFile("https://files.rcsb.org/download/6NNG.pdb").then(function (comp) {
+            component = comp;
+            // Show only Chain F
+            const selection = new NGL.Selection(":F");
+            component.addRepresentation("cartoon", {
+                color: "residueindex",
+                sele: selection.string
+            });
+            component.autoView();
+            component.setSpin(true);
+        });
+
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+
+        darkModeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            
+            // Update NGL viewer background
+            stage.setParameters({
+                backgroundColor: body.classList.contains('dark-mode') ? "black" : "white"
+            });
+
+            // Save user preference
+            if (body.classList.contains('dark-mode')) {
+                localStorage.setItem('darkMode', 'enabled');
+            } else {
+                localStorage.setItem('darkMode', 'disabled');
+            }
+        });
+
+        // Set dark mode as default if not set
+        if (!localStorage.getItem('darkMode')) {
+            localStorage.setItem('darkMode', 'enabled');
+            body.classList.add('dark-mode');
+        } else if (localStorage.getItem('darkMode') === 'disabled') {
+            body.classList.remove('dark-mode');
+        }
+    </script>
 </body>
 </html>
