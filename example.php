@@ -136,9 +136,12 @@ try {
             </a>
             <div class="nav-links">
                 <a href="home.php" class="nav-link"><span>New Search</span></a>
-                <a href="past.php" class="nav-link"><span>Past Searches</span></a>
-                <a href="example.php" class="nav-link active"><span>Example Analysis</span></a>
+                <a href="past.php" class="nav-link active"><span>Past Searches</span></a>
+                <a href="example.php" class="nav-link"><span>Example Analysis</span></a>
                 <a href="about.php" class="nav-link"><span>About</span></a>
+                <a href="help.php" class="nav-link"><span>Help</span></a>
+                <a href="credits.php" class="nav-link"><span>Credits</span></a>
+
             </div>
         </div>
     </nav>
