@@ -150,44 +150,47 @@ try {
             --text-color-dark: #e1e8f0;
             --grid-color-light: rgba(0,0,0,0.1);
             --grid-color-dark: rgba(255,255,255,0.1);
-            --chart-bg-dark: rgba(26, 34, 46, 0.7);
-            --chart-bg-light: rgba(255, 255, 255, 0.7);
-            --hover-bg-dark: rgba(141, 157, 182, 0.8);
             --hover-bg-light: rgba(102, 114, 146, 0.8);
+            --hover-bg-dark: rgba(141, 157, 182, 0.8);
         }
-        
+
         body.dark-mode {
             --bar-color: var(--bar-color-dark);
             --text-color: var(--text-color-dark);
             --grid-color: var(--grid-color-dark);
-            --chart-bg: var(--chart-bg-dark);
             --hover-bg: var(--hover-bg-dark);
         }
-        
+
         body:not(.dark-mode) {
             --bar-color: var(--bar-color-light);
             --text-color: var(--text-color-light);
             --grid-color: var(--grid-color-light);
-            --chart-bg: var(--chart-bg-light);
             --hover-bg: var(--hover-bg-light);
         }
-        
-        .chart-container {
-            background: var(--chart-bg);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0.8rem;
+
+        /* Transparent chart container */
+        .transparent-chart-container {
+            width: 100%;
+            height: 500px;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
         }
-        
-        .js-plotly-plot .plotly .modebar {
-            background: var(--chart-bg) !important;
-            border-radius: 0.5rem;
-            padding: 5px;
+
+        /* Plotly modebar styling */
+        .modebar-container {
+            background: rgba(0,0,0,0.7) !important;
+            border-radius: 4px !important;
+            padding: 5px !important;
         }
-        
-        .js-plotly-plot .plotly .modebar-btn svg {
+
+        .modebar-btn svg {
             fill: var(--text-color) !important;
+        }
+
+        .modebar-btn:hover {
+            background-color: rgba(255,255,255,0.2) !important;
         }
     </style>
 </head>
@@ -213,8 +216,6 @@ try {
                 <a href="past.php" class="nav-link"><span>Past Searches</span></a>
                 <a href="example.php" class="nav-link"><span>Example Analysis</span></a>
                 <a href="about.php" class="nav-link"><span>About</span></a>
-                <a href="help.php" class="nav-link"><span>Help</span></a>
-                <a href="credits.php" class="nav-link"><span>Credits</span></a>
             </div>
         </div>
     </nav>
@@ -268,16 +269,19 @@ try {
                 <p id="currentDescription"><?= htmlspecialchars($descriptions[array_key_first($aa_data)] ?? 'No description available') ?></p>
             </div>
 
-            <div id="aaChart" class="chart-container"></div>
+            <!-- Transparent chart container -->
+            <div class="transparent-chart-container">
+                <div id="aaChart"></div>
+            </div>
         </div>
     </main>
 
     <!-- Footer -->
     <footer class="footer glass">
         <div class="footer-content">
-            <p>Created as part of the postgraduate course Introduction to Website and Database Design @ the University of Edinburgh, this website reflects coursework submitted for academic assessment.</p>
+            <p>Created as part of the postgraduate course Introduction to Website and Database Design @ the University of Edinburgh</p>
             <a href="https://github.com/B269905-2024/web_project" target="_blank" class="github-link">
-                <i class="fab fa-github"></i> View the source code on GitHub
+                <i class="fab fa-github"></i> View on GitHub
             </a>
         </div>
     </footer>
@@ -306,18 +310,17 @@ try {
         // Dark Mode Management
         const darkModeToggle = document.getElementById('darkModeToggle');
         const body = document.body;
-        
+
         // Initialize dark mode from localStorage
         function initDarkMode() {
             const darkModePref = localStorage.getItem('darkMode');
             if (darkModePref === 'disabled') {
                 body.classList.remove('dark-mode');
             } else if (darkModePref === null) {
-                // Default to dark mode if no preference set
                 localStorage.setItem('darkMode', 'enabled');
             }
         }
-        
+
         // Toggle dark mode
         function toggleDarkMode() {
             body.classList.toggle('dark-mode');
@@ -325,7 +328,7 @@ try {
             localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
             updateChartColors();
         }
-        
+
         // Chart Management
         const aaData = <?= $aa_data_json ?>;
         const descriptions = <?= $descriptions_json ?>;
@@ -333,28 +336,27 @@ try {
         const aminoAcids = Object.keys(aaData[sequenceIds[0]]);
         let currentChartId = sequenceIds[0];
         let chartInstance = null;
-        
+
         // Get current color scheme
         function getColorScheme() {
             return {
                 barColor: getComputedStyle(document.documentElement).getPropertyValue('--bar-color').trim(),
                 textColor: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim(),
                 gridColor: getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim(),
-                chartBg: getComputedStyle(document.documentElement).getPropertyValue('--chart-bg').trim(),
                 hoverBg: getComputedStyle(document.documentElement).getPropertyValue('--hover-bg').trim()
             };
         }
-        
-        // Initialize the chart with dark background
+
+        // Initialize the chart with transparent background
         function initChart() {
             currentChartId = sequenceIds[0];
             const colors = getColorScheme();
-            
+
             const data = [{
                 x: aminoAcids,
                 y: Object.values(aaData[currentChartId]),
                 type: 'bar',
-                marker: { 
+                marker: {
                     color: colors.barColor,
                     line: {
                         color: colors.textColor,
@@ -364,24 +366,21 @@ try {
                 hoverinfo: 'y',
                 hovertemplate: '%{y:.2f}%<extra></extra>'
             }];
-            
+
             const layout = {
                 title: {
                     text: `Amino Acid Composition: ${currentChartId}`,
                     font: {
                         color: colors.textColor,
                         size: 18
-                    },
-                    x: 0.5,
-                    xanchor: 'center'
+                    }
                 },
-                plot_bgcolor: colors.chartBg,
-                paper_bgcolor: colors.chartBg,
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
                 font: {
-                    color: colors.textColor,
-                    family: '"Helvetica Neue", Helvetica, Arial, sans-serif'
+                    color: colors.textColor
                 },
-                xaxis: { 
+                xaxis: {
                     title: {
                         text: 'Amino Acid',
                         font: {
@@ -394,12 +393,9 @@ try {
                         size: 12
                     },
                     gridcolor: colors.gridColor,
-                    tickangle: -45,
-                    fixedrange: true,
-                    showline: true,
-                    linecolor: colors.gridColor
+                    tickangle: -45
                 },
-                yaxis: { 
+                yaxis: {
                     title: {
                         text: 'Percentage (%)',
                         font: {
@@ -412,10 +408,7 @@ try {
                         size: 12
                     },
                     gridcolor: colors.gridColor,
-                    range: [0, Math.max(...Object.values(aaData[currentChartId])) * 1.1],
-                    fixedrange: true,
-                    showline: true,
-                    linecolor: colors.gridColor
+                    range: [0, Math.max(...Object.values(aaData[currentChartId])) * 1.1]
                 },
                 hoverlabel: {
                     bgcolor: colors.hoverBg,
@@ -426,81 +419,65 @@ try {
                     bordercolor: 'transparent'
                 },
                 margin: { t: 80, l: 80, r: 40, b: 100 },
-                showlegend: false,
-                transition: {
-                    duration: 300,
-                    easing: 'cubic-in-out'
-                }
+                showlegend: false
             };
-            
+
             const config = {
                 responsive: true,
                 displayModeBar: true,
                 displaylogo: false,
-                modeBarButtonsToRemove: ['toImage', 'sendDataToCloud'],
-                scrollZoom: false,
-                modeBarButtonsToAdd: [{
-                    name: 'Toggle Dark Mode',
-                    icon: Plotly.Icons.pencil,
-                    click: function(gd) {
-                        document.getElementById('darkModeToggle').click();
-                    }
-                }]
+                modeBarButtonsToRemove: ['toImage', 'sendDataToCloud']
             };
-            
+
             chartInstance = Plotly.newPlot('aaChart', data, layout, config);
-            
+
             // Set initial description
-            document.getElementById('currentDescription').textContent = 
+            document.getElementById('currentDescription').textContent =
                 descriptions[currentChartId] || 'No description available';
         }
-        
+
         // Update chart colors when mode changes
         function updateChartColors() {
             if (!chartInstance) return;
-            
+
             const colors = getColorScheme();
             const update = {
                 marker: { color: colors.barColor }
             };
-            
+
             const layoutUpdate = {
-                plot_bgcolor: colors.chartBg,
-                paper_bgcolor: colors.chartBg,
                 title: { font: { color: colors.textColor } },
                 font: { color: colors.textColor },
-                xaxis: { 
+                xaxis: {
                     title: { font: { color: colors.textColor } },
                     tickfont: { color: colors.textColor },
-                    gridcolor: colors.gridColor,
-                    linecolor: colors.gridColor
+                    gridcolor: colors.gridColor
                 },
-                yaxis: { 
+                yaxis: {
                     title: { font: { color: colors.textColor } },
                     tickfont: { color: colors.textColor },
-                    gridcolor: colors.gridColor,
-                    linecolor: colors.gridColor
+                    gridcolor: colors.gridColor
                 },
                 hoverlabel: { bgcolor: colors.hoverBg }
             };
-            
+
             Plotly.update('aaChart', update, layoutUpdate);
         }
-        
-        // Update chart when sequence selection changes
+
+        // Update chart when sequence selection changes - maintains transparency
         function updateChart(sequenceId) {
             currentChartId = sequenceId;
             const colors = getColorScheme();
-            
+
             // Update description
-            document.getElementById('currentDescription').textContent = 
+            document.getElementById('currentDescription').textContent =
                 descriptions[currentChartId] || 'No description available';
-            
+
             Plotly.react('aaChart', [{
                 x: aminoAcids,
                 y: Object.values(aaData[currentChartId]),
                 type: 'bar',
-                marker: { 
+                marker: {
                     color: colors.barColor,
                     line: {
                         color: colors.textColor,
@@ -510,12 +487,9 @@ try {
                 hoverinfo: 'y',
                 hovertemplate: '%{y:.2f}%<extra></extra>'
             }], {
-                plot_bgcolor: colors.chartBg,
-                paper_bgcolor: colors.chartBg,
-                title: {
-                    text: `Amino Acid Composition: ${currentChartId}`,
-                    font: { color: colors.textColor }
-                },
+                title: `Amino Acid Composition: ${currentChartId}`,
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
                 yaxis: {
                     range: [0, Math.max(...Object.values(aaData[currentChartId])) * 1.1]
                 },
@@ -524,19 +498,19 @@ try {
                 }
             });
         }
-        
+
         // Initialize everything when the page loads
         document.addEventListener('DOMContentLoaded', function() {
             initDarkMode();
             initChart();
-            
+
             // Set up event listeners
             darkModeToggle.addEventListener('click', toggleDarkMode);
-            
+
             document.getElementById('sequenceSelector').addEventListener('change', function(e) {
                 updateChart(e.target.value);
             });
-            
+
             // Handle window resize
             window.addEventListener('resize', function() {
                 Plotly.Plots.resize('aaChart');
