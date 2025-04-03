@@ -108,9 +108,6 @@ try {
             <!-- Sequence Viewer -->
             <div class="sequence-viewer-container">
                 <div class="sequence-controls">
-                    <div class="search-box">
-                        <input type="text" id="sequenceSearch" placeholder="Search sequences...">
-                    </div>
                     <div class="view-options">
                         <button class="view-option active" data-view="full">Full</button>
                         <button class="view-option" data-view="compact">Compact</button>
@@ -310,20 +307,6 @@ try {
             });
         });
 
-        // Sequence Search
-        document.getElementById('sequenceSearch').addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            document.querySelectorAll('.sequence-card').forEach(card => {
-                const headerText = card.querySelector('.sequence-header').textContent.toLowerCase();
-                const sequenceText = card.querySelector('.sequence-data').textContent.toLowerCase();
-                
-                if (headerText.includes(searchTerm) || sequenceText.includes(searchTerm)) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        });
     </script>
 </body>
 </html>
