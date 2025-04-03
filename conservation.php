@@ -366,9 +366,9 @@ if (!empty(array_column($results, 'plotcon_score'))) {
         <div class="conservation-header glass">
             <h1>Conservation Analysis</h1>
             <div class="job-info">
-                <p><i class="fas fa-dna"></i> <strong>Protein/Gene:</strong> <?php echo htmlspecialchars($job['search_term']); ?></p>
-                <p><i class="fas fa-tree"></i> <strong>Taxonomic Group:</strong> <?php echo htmlspecialchars($job['taxon']); ?></p>
-                <p><i class="fas fa-sliders-h"></i> <strong>Window Size:</strong> <?php echo $window_size; ?></p>
+                <p><strong>Protein/Gene:</strong> <?php echo htmlspecialchars($job['search_term']); ?></p>
+                <p><strong>Taxonomic Group:</strong> <?php echo htmlspecialchars($job['taxon']); ?></p>
+                <p><strong>Window Size:</strong> <?php echo $window_size; ?></p>
             </div>
         </div>
 
@@ -376,13 +376,13 @@ if (!empty(array_column($results, 'plotcon_score'))) {
             <!-- Entropy Plot -->
             <div class="analysis-card glass">
                 <div class="card-header">
-                    <h2><i class="fas fa-chart-line"></i> Shannon Entropy Analysis</h2>
+                    <h2>Shannon Entropy Analysis</h2>
                     <div class="download-buttons">
                         <a href="download_conservation.php?type=entropy_json&conservation_id=<?php echo $conservation_job['conservation_id']; ?>" class="download-btn">
-                            <i class="fas fa-file-code"></i> JSON
+                            JSON
                         </a>
                         <a href="download_conservation.php?type=entropy_csv&conservation_id=<?php echo $conservation_job['conservation_id']; ?>" class="download-btn secondary">
-                            <i class="fas fa-file-csv"></i> CSV
+                            CSV
                         </a>
                     </div>
                 </div>
@@ -399,10 +399,10 @@ if (!empty(array_column($results, 'plotcon_score'))) {
             <!-- Sequence Alignment -->
             <div class="analysis-card glass">
                 <div class="card-header">
-                    <h2><i class="fas fa-align-left"></i> Multiple Sequence Alignment</h2>
+                    <h2>Multiple Sequence Alignment</h2>
                     <div class="download-buttons">
                         <a href="download_conservation.php?type=alignment&conservation_id=<?php echo $conservation_job['conservation_id']; ?>" class="download-btn">
-                            <i class="fas fa-download"></i> FASTA
+                            FASTA
                         </a>
                     </div>
                 </div>
@@ -420,10 +420,10 @@ if (!empty(array_column($results, 'plotcon_score'))) {
                 <!-- Plotcon Analysis -->
                 <div class="analysis-card glass">
                     <div class="card-header">
-                        <h2><i class="fas fa-wave-square"></i> EMBOSS Plotcon Analysis</h2>
+                        <h2>EMBOSS Plotcon Analysis</h2>
                         <div class="download-buttons">
                             <a href="download_conservation.php?type=plotcon_csv&conservation_id=<?php echo $conservation_job['conservation_id']; ?>" class="download-btn secondary">
-                                <i class="fas fa-file-csv"></i> CSV
+                                CSV
                             </a>
                         </div>
                     </div>
@@ -441,7 +441,7 @@ if (!empty(array_column($results, 'plotcon_score'))) {
             <!-- Analysis Report -->
             <div class="analysis-card glass report-card">
                 <div class="card-header">
-                    <h2><i class="fas fa-file-alt"></i> Analysis Report</h2>
+                    <h2>Analysis Report</h2>
                 </div>
                 <div class="report-content">
                     <pre><?php echo htmlspecialchars($report['report_text']); ?></pre>
@@ -451,11 +451,11 @@ if (!empty(array_column($results, 'plotcon_score'))) {
             <!-- Interpretation Guide -->
             <div class="analysis-card glass guide-card">
                 <div class="card-header">
-                    <h2><i class="fas fa-question-circle"></i> Interpretation Guide</h2>
+                    <h2>Interpretation Guide</h2>
                 </div>
                 <div class="guide-content">
                     <div class="guide-section">
-                        <h3><i class="fas fa-chart-line"></i> Shannon Entropy</h3>
+                        <h3>Shannon Entropy</h3>
                         <ul>
                             <li><strong>0 bits</strong> - Perfectly conserved position</li>
                             <li><strong>Higher values</strong> - More diversity at that position</li>
@@ -463,7 +463,7 @@ if (!empty(array_column($results, 'plotcon_score'))) {
                         </ul>
                     </div>
                     <div class="guide-section">
-                        <h3><i class="fas fa-wave-square"></i> Plotcon Analysis</h3>
+                        <h3>Plotcon Analysis</h3>
                         <ul>
                             <li>Shows smoothed conservation over <?php echo $window_size; ?>-residue windows</li>
                             <li><strong>High scores</strong> - Conserved regions</li>
@@ -471,7 +471,7 @@ if (!empty(array_column($results, 'plotcon_score'))) {
                         </ul>
                     </div>
                     <div class="guide-section">
-                        <h3><i class="fas fa-lightbulb"></i> Key Insights</h3>
+                        <h3>Key Insights</h3>
                         <ul>
                             <li>Most conserved position: <?php echo $report['min_position']; ?> (<?php echo number_format($report['min_entropy'], 3); ?> bits)</li>
                             <li>Most variable position: <?php echo $report['max_position']; ?> (<?php echo number_format($report['max_entropy'], 3); ?> bits)</li>
