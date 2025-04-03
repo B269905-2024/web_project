@@ -1,0 +1,258 @@
+/* Inherit from general.css */
+@import url('general.css');
+
+/* Conservation Analysis Specific Styles */
+.conservation-content {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.conservation-header {
+    padding: 2rem;
+    border-radius: 1rem;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.conservation-header h1 {
+    font-size: var(--text-xl);
+    color: var(--primary);
+    margin-bottom: 1.5rem;
+}
+
+.job-info {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.job-info p {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--text-sm);
+    color: var(--text);
+}
+
+.job-info i {
+    color: var(--primary);
+}
+
+.conservation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(30rem, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.analysis-card {
+    border-radius: 1rem;
+    padding: 1.5rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.analysis-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.card-header h2 {
+    font-size: var(--text-lg);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.download-buttons {
+    display: flex;
+    gap: 0.8rem;
+}
+
+.download-btn {
+    padding: 0.6rem 1rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-xs);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.download-btn {
+    background: var(--primary);
+    color: white;
+}
+
+.download-btn:hover {
+    background: var(--secondary);
+    transform: translateY(-2px);
+}
+
+.download-btn.secondary {
+    background: var(--accent);
+}
+
+.download-btn.secondary:hover {
+    background: var(--secondary);
+}
+
+.plot-container {
+    height: 25rem;
+    width: 100%;
+    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: var(--background);
+}
+
+.plot-description {
+    font-size: var(--text-xs);
+    color: var(--text);
+    opacity: 0.8;
+    margin-top: 0.5rem;
+}
+
+.sequence-viewer {
+    height: 25rem;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-xs);
+    line-height: 1.5;
+}
+
+.sequence-entry {
+    margin-bottom: 1.5rem;
+}
+
+.sequence-id {
+    font-weight: bold;
+    color: var(--primary);
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.sequence-text {
+    color: var(--text);
+    word-break: break-all;
+}
+
+.report-card .report-content {
+    height: 25rem;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-xs);
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.guide-card .guide-content {
+    padding: 0.5rem;
+}
+
+.guide-section {
+    margin-bottom: 1.5rem;
+}
+
+.guide-section h3 {
+    font-size: var(--text-base);
+    color: var(--primary);
+    margin-bottom: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.guide-section ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.guide-section li {
+    margin-bottom: 0.5rem;
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+.guide-section li:before {
+    content: "•";
+    color: var(--primary);
+    position: absolute;
+    left: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .conservation-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .conservation-header {
+        padding: 1.5rem;
+    }
+    
+    .job-info {
+        flex-direction: column;
+        align-items: center;
+        gap: 0.8rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .conservation-content {
+        padding: 1rem;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .download-buttons {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .conservation-header h1 {
+        font-size: var(--text-lg);
+    }
+    
+    .plot-container {
+        height: 20rem;
+    }
+    
+    .sequence-viewer,
+    .report-card .report-content {
+        height: 20rem;
+    }
+    
+    .download-buttons {
+        justify-content: space-between;
+    }
+    
+    .download-btn {
+        flex-grow: 1;
+        justify-content: center;
+    }
+}
