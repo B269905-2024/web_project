@@ -157,48 +157,39 @@ try {
                 <button type="submit" class="submit-btn">Search</button>
             </form>
 
+            <!-- Analysis Tools Section -->
             <div class="tools-section">
-                <h2>Example Searches</h2>
+                <h2>Bioinformatics Analysis Tools</h2>
+                <p class="tools-description">Our platform provides comprehensive computational tools for protein characterization:</p>
+
                 <div class="analysis-cards">
                     <div class="card">
                         <div class="card-front">
-                            <h3>Glucose-6-phosphatase</h3>
-                            <p>in Aves (birds)</p>
+                            <h3>Conservation Analysis</h3>
                         </div>
                         <div class="card-back">
-                            <p>Search for glucose-6-phosphatase enzymes in avian species to study metabolic adaptations in birds.</p>
+                            <p>Identifies evolutionarily conserved protein regions using Shannon entropy metrics and multiple sequence alignment.</p>
                         </div>
                     </div>
 
                     <div class="card">
                         <div class="card-front">
-                            <h3>ABC transporters</h3>
-                            <p>in Mammalia (mammals)</p>
+                            <h3>Motif Scan</h3>
                         </div>
                         <div class="card-back">
-                            <p>Explore ABC transporter proteins across mammalian species to understand membrane transport mechanisms.</p>
+                            <p>Detects functional protein motifs using PROSITE patterns and regular expressions.</p>
                         </div>
                     </div>
 
                     <div class="card">
                         <div class="card-front">
-                            <h3>Kinases</h3>
-                            <p>in Rodentia (rodents)</p>
+                            <h3>Content Analysis</h3>
                         </div>
                         <div class="card-back">
-                            <p>Investigate kinase proteins in rodents to study signal transduction pathways in these model organisms.</p>
+                            <p>Quantifies amino acid composition to reveal structural and functional protein properties.</p>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="example-searches">
-                <h3>Search Suggestions:</h3>
-                <ul>
-                    <li>Glucose-6-phosphatase in Aves (birds)</li>
-                    <li>ABC transporters in Mammalia (mammals)</li>
-                    <li>Kinases in Rodentia (rodents)</li>
-                </ul>
             </div>
         </div>
 
@@ -299,7 +290,7 @@ try {
 
         darkModeToggle.addEventListener('click', () => {
             body.classList.toggle('dark-mode');
-            
+
             // Update NGL viewer background
             stage.setParameters({
                 backgroundColor: body.classList.contains('dark-mode') ? "black" : "white"

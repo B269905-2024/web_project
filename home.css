@@ -265,20 +265,25 @@ body:not(.dark-mode) .nav-link {
 
 .nav-links {
     display: flex;
-    gap: 2.5rem;
+    gap: 1rem;
+    flex-grow: 1;
+    justify-content: center;
 }
 
 .nav-link {
     position: relative;
     text-decoration: none;
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
     font-weight: 500;
     transition: all 0.3s ease;
-    padding: 0.5rem 1rem;
+    padding: 0.8rem 1.2rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100%;
+    height: 3rem;
+    min-width: 7rem;
+    text-align: center;
+    border-radius: 0.5rem;
 }
 
 .nav-link span {
@@ -287,19 +292,18 @@ body:not(.dark-mode) .nav-link {
     justify-content: center;
     height: 100%;
     width: 100%;
+    line-height: 1.2;
 }
 
 .nav-link:hover,
 .nav-link.active {
     opacity: 0.9;
     background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 0.5rem;
 }
 
 /* Background container effect */
 .nav-link:hover {
     background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 0.5rem;
 }
 
 /* Dark mode specific hover colors */
@@ -315,24 +319,22 @@ body:not(.dark-mode) .nav-link:hover {
 /* Active link styling */
 .nav-link.active {
     background-color: rgba(255, 255, 255, 0.2);
-    border-radius: 0.5rem;
 }
 
 /* Main Content */
 .main-content {
-    display: flex;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.5rem;
     padding: 2.5rem;
     max-width: 1400px;
     margin: 2rem auto;
-    flex-wrap: wrap;
 }
 
 .form-container {
     border-radius: 1rem;
     padding: 2.5rem;
     width: 100%;
-    max-width: 800px;
 }
 
 /* Darker blue-ish headings in light mode */
@@ -419,6 +421,13 @@ h3 {
     margin-top: 2.5rem;
 }
 
+.tools-description {
+    font-size: var(--text-sm);
+    margin-bottom: 1.5rem;
+    text-align: center;
+    color: var(--text);
+}
+
 /* Cards */
 .analysis-cards {
     display: grid;
@@ -482,43 +491,12 @@ h3 {
     transform: rotateY(0deg);
 }
 
-/* Example Searches Section */
-.example-searches {
-    margin-top: 2.5rem;
-    padding: 1.5rem;
-    background: var(--glass);
-    border-radius: 0.8rem;
-    border: 1px solid var(--accent);
-}
-
-.example-searches h3 {
-    color: var(--primary);
-    margin-bottom: 1rem;
-    font-size: var(--text-base);
-}
-
-.example-searches ul {
-    list-style-type: none;
-    padding-left: 0;
-}
-
-.example-searches li {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    font-size: var(--text-sm);
-}
-
-.example-searches li:last-child {
-    border-bottom: none;
-}
-
 /* Viewer Container */
 .viewer-container {
     border-radius: 1rem;
     padding: 1.8rem;
     width: 100%;
-    max-width: 800px;
-    margin-left: 2.5rem;
+    height: fit-content;
 }
 
 .viewer-header {
@@ -608,12 +586,10 @@ body:not(.dark-mode) #protein-viewer {
 /* Responsive Design */
 @media (max-width: 1024px) {
     .main-content {
-        flex-direction: column;
-        align-items: center;
+        grid-template-columns: 1fr;
     }
-    
+
     .viewer-container {
-        margin-left: 0;
         margin-top: 2.5rem;
     }
 
@@ -623,7 +599,7 @@ body:not(.dark-mode) #protein-viewer {
     }
 
     .nav-links {
-        gap: 1.5rem;
+        gap: 1rem;
     }
 }
 
@@ -650,8 +626,13 @@ body:not(.dark-mode) #protein-viewer {
 
     .nav-links {
         flex-wrap: wrap;
-        gap: 0.8rem;
-        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .nav-link {
+        min-width: 6rem;
+        padding: 0.6rem 0.8rem;
+        font-size: var(--text-xs);
     }
 
     .logo-nav-container {
@@ -678,8 +659,9 @@ body:not(.dark-mode) #protein-viewer {
     }
 
     .nav-link {
-        padding: 0.5rem;
-        font-size: var(--text-sm);
+        min-width: 5rem;
+        height: 2.5rem;
+        font-size: 0.8rem;
     }
 
     .form-container, .viewer-container {
