@@ -355,3 +355,29 @@ button:hover, .action-btn:hover {
         font-size: 0.8rem;
     }
 }
+/* Update the nav-link hover styles in general.css */
+.nav-link:hover,
+.nav-link.active {
+    opacity: 0.9;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Background container effect */
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Dark mode specific hover colors */
+body.dark-mode .nav-link:hover {
+    background-color: rgba(173, 216, 230, 0.1);
+}
+
+/* Light mode specific hover colors */
+body:not(.dark-mode) .nav-link:hover {
+    background-color: rgba(199, 21, 133, 0.1);
+}
+
+/* Active link styling */
+.nav-link.active {
+    background-color: rgba(255, 255, 255, 0.2);
+}
