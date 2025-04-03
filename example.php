@@ -1,4 +1,3 @@
-this is example.php
 <?php
 // Set infinite session cookie at the very top
 setcookie('protein_search_session', 'permanent_session', [
@@ -61,7 +60,6 @@ try {
     $sequences = $stmt->fetchAll();
     $sequence_count = count($sequences);
 
-    // [Rest of your existing code remains exactly the same...]
     // Get conservation analysis
     $stmt = $pdo->prepare("SELECT * FROM conservation_jobs WHERE job_id = ? ORDER BY created_at DESC LIMIT 1");
     $stmt->execute([$job_id]);
@@ -109,7 +107,6 @@ try {
         $motif_reports = $stmt->fetchAll();
     }
 
-    // [Continue with the rest of your existing code...]
     // Prepare data for visualization
     $entropy_data = [];
     $plotcon_data = [];
@@ -191,209 +188,117 @@ try {
     <title>Permanent Analysis Report - Job #<?= $job_id ?></title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
-        .section { margin-bottom: 30px; border: 1px solid #ddd; border-radius: 5px; padding: 20px; }
-        .section-title { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 0; }
-        .plot-container { height: 400px; margin: 20px 0; }
-        .sequence-viewer { font-family: monospace; background: #f8f9fa; padding: 15px; overflow-x: auto; white-space: pre; }
-        .motif { background-color: #f0f7ff; padding: 10px; margin: 10px 0; border-left: 4px solid #3498db; }
-        .highlight { background-color: #ffeb3b; padding: 2px; }
-        .btn {
-            display: inline-block;
-            padding: 8px 16px;
-            background: #3498db;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            margin-right: 10px;
-            margin-bottom: 10px;
+        .scrollable-box {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            font-family: monospace;
+            background: #f8f9fa;
+            white-space: pre;
         }
-        .btn:hover { background: #2980b9; }
-        .btn-green { background: #2ecc71; }
-        .btn-green:hover { background: #27ae60; }
-        .btn-purple { background: #9b59b6; }
-        .btn-purple:hover { background: #8e44ad; }
+        body { font-family: Arial, sans-serif; margin: 20px; }
         .nav { margin-bottom: 20px; }
-        .summary-card {
-            background: white;
-            border-radius: 5px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .insights { background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .permanent-notice {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
+        .nav a { margin-right: 10px; }
+        .section { margin-bottom: 30px; }
+        .plot-container { height: 400px; margin: 20px 0; }
+        select { padding: 5px; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="permanent-notice">
-            <h3>Permanent Access Enabled</h3>
-            <p>This page and job #<?= $job_id ?> are now permanently accessible from any browser.</p>
-        </div>
+    <div class="nav">
+        <a href="home.php">New Search</a>
+        <a href="past.php">Past Searches</a>
+        <a href="results.php?job_id=<?= $job_id ?>">Back to Results</a>
+    </div>
 
-        <div class="nav">
-            <a href="home.php" class="btn">New Search</a>
-            <a href="past.php" class="btn">Past Searches</a>
-            <a href="results.php?job_id=<?= $job_id ?>" class="btn">Back to Results</a>
-        </div>
+    <div>
+        <h1>Analysis Report - Job #<?= $job_id ?></h1>
+        <p><strong>Search Term:</strong> <?= htmlspecialchars($job_info['search_term']) ?> | 
+           <strong>Taxon:</strong> <?= htmlspecialchars($job_info['taxon']) ?></p>
+        <p><strong>Sequences:</strong> <?= $sequence_count ?> | 
+           <strong>Date:</strong> <?= date('M j, Y g:i a', strtotime($job_info['created_at'])) ?></p>
+    </div>
 
-        <div class="header">
-            <h1>Permanent Analysis Report</h1>
-            <p><strong>Job ID:</strong> <?= $job_id ?> | <strong>Search Term:</strong> <?= htmlspecialchars($job_info['search_term']) ?> |
-               <strong>Taxon:</strong> <?= htmlspecialchars($job_info['taxon']) ?></p>
-            <p><strong>Sequences:</strong> <?= $sequence_count ?> | <strong>Date:</strong> <?= date('M j, Y g:i a', strtotime($job_info['created_at'])) ?></p>
-        </div>
-
-        <!-- [Rest of your HTML remains exactly the same...] -->
-        <div class="summary-grid">
-            <div class="summary-card">
-                <h3>Conservation Analysis</h3>
-                <?php if ($conservation_job): ?>
-                    <p><strong>Status:</strong> <?= ucfirst($conservation_job['status']) ?></p>
-                    <p><strong>Window Size:</strong> <?= $conservation_job['window_size'] ?></p>
-                    <p><strong>Mean Entropy:</strong> <?= number_format($conservation_report['mean_entropy'] ?? 0, 3) ?> bits</p>
-                    <a href="conservation.php?job_id=<?= $job_id ?>" class="btn btn-green">View Details</a>
-                <?php else: ?>
-                    <p>No conservation analysis performed</p>
-                    <a href="conservation.php?job_id=<?= $job_id ?>" class="btn">Run Analysis</a>
-                <?php endif; ?>
-            </div>
-
-            <div class="summary-card">
-                <h3>Motif Analysis</h3>
-                <?php if ($motif_job): ?>
-                    <p><strong>Motifs Found:</strong> <?= count($motif_results) ?></p>
-                    <p><strong>Unique Motifs:</strong> <?= count(array_unique(array_column($motif_results, 'motif_name'))) ?></p>
-                    <a href="motifs.php?job_id=<?= $job_id ?>" class="btn btn-green">View Details</a>
-                <?php else: ?>
-                    <p>No motif analysis performed</p>
-                    <a href="motifs.php?job_id=<?= $job_id ?>" class="btn">Run Analysis</a>
-                <?php endif; ?>
-            </div>
-
-            <div class="summary-card">
-                <h3>Amino Acid Content</h3>
-                <p><strong>Sequences Analyzed:</strong> <?= $sequence_count ?></p>
-                <a href="content.php?job_id=<?= $job_id ?>" class="btn btn-green">View Details</a>
-            </div>
-        </div>
-
+    <div class="section">
+        <h2>Conservation Analysis</h2>
         <?php if ($conservation_job): ?>
-        <div class="section">
-            <h2 class="section-title">Conservation Analysis</h2>
-
             <div class="plot-container" id="entropyPlot"></div>
-
             <?php if ($plotcon_data): ?>
                 <div class="plot-container" id="plotconPlot"></div>
             <?php endif; ?>
 
-            <div class="insights">
-                <h3>Key Insights</h3>
-                <?php if ($conservation_report): ?>
-                    <pre><?= htmlspecialchars($conservation_report['report_text']) ?></pre>
-                <?php else: ?>
-                    <p>No detailed report available</p>
-                <?php endif; ?>
-            </div>
-
             <h3>Aligned Sequences</h3>
-            <div class="sequence-viewer">
+            <div class="scrollable-box">
                 <?php foreach ($conservation_alignments as $aln): ?>
                     ><?= htmlspecialchars($aln['ncbi_id']) ?><br>
                     <?= chunk_split($aln['sequence'], 80, "<br>") ?><br><br>
                 <?php endforeach; ?>
             </div>
-        </div>
+        <?php else: ?>
+            <p>No conservation analysis performed</p>
         <?php endif; ?>
+    </div>
 
-        <?php if ($motif_job): ?>
-        <div class="section">
-            <h2 class="section-title">Motif Analysis</h2>
+    <?php if ($motif_job): ?>
+    <div class="section">
+        <h2>Motif Analysis</h2>
+        <p><strong>Total Motifs Found:</strong> <?= count($motif_results) ?></p>
+        
+        <?php
+        $motifs_by_sequence = [];
+        foreach ($motif_results as $motif) {
+            $motifs_by_sequence[$motif['sequence']][] = $motif;
+        }
+        ?>
 
-            <p><strong>Total Motifs Found:</strong> <?= count($motif_results) ?></p>
-            <p><strong>Unique Motif Types:</strong> <?= count(array_unique(array_column($motif_results, 'motif_name'))) ?></p>
-
-            <h3>Motifs by Sequence</h3>
-            <?php
-            $motifs_by_sequence = [];
-            foreach ($motif_results as $motif) {
-                $motifs_by_sequence[$motif['sequence']][] = $motif;
-            }
-            ?>
-
-            <?php foreach ($motifs_by_sequence as $seq_id => $seq_motifs): ?>
-                <div style="margin-bottom: 20px;">
-                    <h4><?= htmlspecialchars($seq_id) ?> (<?= count($seq_motifs) ?> motifs)</h4>
-
-                    <?php
-                    $sequence = '';
-                    foreach ($sequences as $seq) {
-                        if ($seq['ncbi_id'] == $seq_id) {
-                            $sequence = $seq['sequence'];
-                            break;
-                        }
+        <?php foreach ($motifs_by_sequence as $seq_id => $seq_motifs): ?>
+            <div>
+                <h3><?= htmlspecialchars($seq_id) ?> (<?= count($seq_motifs) ?> motifs)</h3>
+                <?php
+                $sequence = '';
+                foreach ($sequences as $seq) {
+                    if ($seq['ncbi_id'] == $seq_id) {
+                        $sequence = $seq['sequence'];
+                        break;
                     }
-                    ?>
+                }
+                ?>
 
-                    <?php foreach ($seq_motifs as $motif): ?>
-                        <div class="motif">
-                            <p><strong><?= htmlspecialchars($motif['motif_name']) ?></strong>
-                            (Positions: <?= $motif['start_pos'] ?>-<?= $motif['end_pos'] ?>)</p>
-
-                            <?php
-                            $start = max(0, $motif['start_pos'] - 10);
-                            $end = min(strlen($sequence), $motif['end_pos'] + 10);
-                            $segment = substr($sequence, $start, $end - $start);
-                            $highlight_start = $motif['start_pos'] - $start - 1;
-                            $highlight_length = $motif['end_pos'] - $motif['start_pos'] + 1;
-                            ?>
-
-                            <div style="font-family: monospace; margin: 5px 0;">
-                                <?= substr($segment, 0, $highlight_start) ?>
-                                <span class="highlight"><?= substr($segment, $highlight_start, $highlight_length) ?></span>
-                                <?= substr($segment, $highlight_start + $highlight_length) ?>
-                            </div>
-                            <div style="font-family: monospace; color: #666;">
-                                <?= str_repeat('&nbsp;', $highlight_start) ?>
-                                <?= str_repeat('^', $highlight_length) ?>
-                            </div>
+                <?php foreach ($seq_motifs as $motif): ?>
+                    <div>
+                        <p><strong><?= htmlspecialchars($motif['motif_name']) ?></strong>
+                        (Positions: <?= $motif['start_pos'] ?>-<?= $motif['end_pos'] ?>)</p>
+                        <?php
+                        $start = max(0, $motif['start_pos'] - 10);
+                        $end = min(strlen($sequence), $motif['end_pos'] + 10);
+                        $segment = substr($sequence, $start, $end - $start);
+                        $highlight_start = $motif['start_pos'] - $start - 1;
+                        $highlight_length = $motif['end_pos'] - $motif['start_pos'] + 1;
+                        ?>
+                        <div style="font-family: monospace;">
+                            <?= substr($segment, 0, $highlight_start) ?>
+                            <span style="background-color: #ffeb3b;"><?= substr($segment, $highlight_start, $highlight_length) ?></span>
+                            <?= substr($segment, $highlight_start + $highlight_length) ?>
                         </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
-
-        <div class="section">
-            <h2 class="section-title">Amino Acid Content Analysis</h2>
-
-            <select id="sequenceSelector" style="width: 100%; padding: 10px; margin: 20px 0;">
-                <?php foreach (array_keys($aa_data) as $id): ?>
-                    <option value="<?= htmlspecialchars($id) ?>"><?= htmlspecialchars($id) ?></option>
+                    </div>
                 <?php endforeach; ?>
-            </select>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 
-            <div class="plot-container" id="aaChart"></div>
-        </div>
+    <div class="section">
+        <h2>Amino Acid Content Analysis</h2>
+        <select id="sequenceSelector">
+            <?php foreach (array_keys($aa_data) as $id): ?>
+                <option value="<?= htmlspecialchars($id) ?>"><?= htmlspecialchars($id) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <div class="plot-container" id="aaChart"></div>
     </div>
 
     <script>
-        // Conservation plots
         <?php if ($entropy_data): ?>
             var entropyData = <?= json_encode($entropy_data) ?>;
             Plotly.newPlot("entropyPlot", entropyData.data, entropyData.layout);
@@ -404,9 +309,8 @@ try {
             Plotly.newPlot("plotconPlot", plotconData.data, plotconData.layout);
         <?php endif; ?>
 
-        // Amino acid content chart
         const aaData = <?= $aa_data_json ?>;
-
+        
         function updateChart(selectedId) {
             const data = [{
                 x: Object.keys(aaData[selectedId]),
@@ -418,18 +322,14 @@ try {
             const layout = {
                 title: `Amino Acid Composition: ${selectedId}`,
                 xaxis: { title: 'Amino Acid' },
-                yaxis: { title: 'Percentage (%)' },
-                hovermode: 'closest'
+                yaxis: { title: 'Percentage (%)' }
             };
 
             Plotly.react('aaChart', data, layout);
         }
 
-        // Initial chart load
-        const initialId = Object.keys(aaData)[0];
-        updateChart(initialId);
-
-        // Update chart on selection change
+        updateChart(document.getElementById('sequenceSelector').value);
+        
         document.getElementById('sequenceSelector').addEventListener('change', function(e) {
             updateChart(e.target.value);
         });
