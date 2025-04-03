@@ -87,7 +87,7 @@ try {
     }
 
     // Get sequences for analysis
-    $sql = "SELECT ncbi_id, sequence FROM sequences WHERE job_id = ?";
+    $sql = "SELECT ncbi_id, description, sequence FROM sequences WHERE job_id = ?";
     if ($subset) {
         $sql .= " LIMIT ?";
         $stmt = $pdo->prepare($sql);
@@ -101,6 +101,7 @@ try {
     // Calculate amino acid percentages
     $aa_data = [];
     $amino_acids = str_split('ACDEFGHIKLMNPQRSTVWY');
+    $descriptions = [];
 
     foreach ($sequences as $seq) {
         $sequence = strtoupper($seq['sequence']);
@@ -119,9 +120,11 @@ try {
         }
 
         $aa_data[$seq['ncbi_id']] = $percentages;
+        $descriptions[$seq['ncbi_id']] = $seq['description'];
     }
 
     $aa_data_json = json_encode($aa_data);
+    $descriptions_json = json_encode($descriptions);
 
 } catch (PDOException $e) {
     die("Database error: " . $e->getMessage());
@@ -129,110 +132,366 @@ try {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Amino Acid Content Analysis</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amino Acid Content Analysis | Protein Analysis Suite</title>
+    <link rel="stylesheet" href="content.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="icon" href="images/logo.png" type="image/png">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <style>
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        #sequenceSelector { width: 100%; padding: 10px; margin: 20px 0; }
-        #aaChart { width: 100%; height: 600px; }
-        .subset-info { background: #e8f5e9; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
-        .download-btn {
-            display: inline-block;
-            background: #27ae60;
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-top: 20px;
-            border: none;
-            cursor: pointer;
-            font-size: 1em;
+        /* Dynamic colors that change with dark/light mode */
+        :root {
+            --bar-color-light: #667292;
+            --bar-color-dark: #8d9db6;
+            --text-color-light: #222222;
+            --text-color-dark: #e1e8f0;
+            --grid-color-light: rgba(0,0,0,0.1);
+            --grid-color-dark: rgba(255,255,255,0.1);
         }
-        .download-btn:hover {
-            background: #219653;
+        
+        body.dark-mode {
+            --bar-color: var(--bar-color-dark);
+            --text-color: var(--text-color-dark);
+            --grid-color: var(--grid-color-dark);
         }
-        .action-buttons {
-            margin: 20px 0;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .action-btn {
-            padding: 8px 12px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 14px;
-            display: inline-block;
-        }
-        .action-btn:hover { background: #45a049; }
-        .action-btn.secondary {
-            background: #2196F3;
-        }
-        .action-btn.secondary:hover {
-            background: #0b7dda;
+        
+        body:not(.dark-mode) {
+            --bar-color: var(--bar-color-light);
+            --text-color: var(--text-color-light);
+            --grid-color: var(--grid-color-light);
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="action-buttons">
-            <a href="results.php?job_id=<?= $job_id ?>" class="action-btn secondary">Back to Results</a>
-            <a href="content.php?job_id=<?= $job_id ?>&subset=<?= $subset ?>&generate_report=1" class="action-btn">Download TXT Report</a>
-        </div>
+<body class="dark-mode">
+    <!-- Animated Background -->
+    <div id="particles-js"></div>
 
-        <h1>Amino Acid Content Analysis: <?= htmlspecialchars($job['search_term']) ?></h1>
-        <p><strong>Job ID:</strong> <?= htmlspecialchars($job_id) ?></p>
-        <p><strong>Taxonomic Group:</strong> <?= htmlspecialchars($job['taxon']) ?></p>
+    <!-- Dark Mode Toggle -->
+    <button id="darkModeToggle" class="dark-mode-toggle">
+        <span class="toggle-icon"></span>
+    </button>
 
-        <?php if ($subset): ?>
-            <div class="subset-info">
-                <strong>Using subset:</strong> First <?= $subset ?> sequences
+    <!-- Top Navigation Bar -->
+    <nav class="top-bar glass">
+        <div class="logo-nav-container">
+            <a href="home.php" class="logo-tab">
+                <img src="images/full_logo.png" alt="Protein Analysis Suite" class="logo">
+                <span>Protein Analysis Suite</span>
+            </a>
+
+            <div class="nav-links">
+                <a href="home.php" class="nav-link"><span>New Search</span></a>
+                <a href="past.php" class="nav-link"><span>Past Searches</span></a>
+                <a href="example.php" class="nav-link"><span>Example Analysis</span></a>
+                <a href="about.php" class="nav-link"><span>About</span></a>
+                <a href="help.php" class="nav-link"><span>Help</span></a>
+                <a href="credits.php" class="nav-link"><span>Credits</span></a>
             </div>
-        <?php endif; ?>
+        </div>
+    </nav>
 
-        <select id="sequenceSelector">
-            <?php foreach (array_keys($aa_data) as $id): ?>
-                <option value="<?= htmlspecialchars($id) ?>"><?= htmlspecialchars($id) ?></option>
-            <?php endforeach; ?>
-        </select>
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="analysis-container glass">
+            <div class="action-buttons">
+                <a href="results.php?job_id=<?= $job_id ?>" class="action-btn secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Results
+                </a>
+                <a href="content.php?job_id=<?= $job_id ?>&subset=<?= $subset ?>&generate_report=1" class="action-btn">
+                    <i class="fas fa-download"></i> Download TXT Report
+                </a>
+            </div>
 
-        <div id="aaChart"></div>
-    </div>
+            <h1>Amino Acid Content Analysis</h1>
+            <div class="job-info">
+                <div class="info-card">
+                    <h3>Search Term</h3>
+                    <p><?= htmlspecialchars($job['search_term']) ?></p>
+                </div>
+                <div class="info-card">
+                    <h3>Job ID</h3>
+                    <p><?= htmlspecialchars($job_id) ?></p>
+                </div>
+                <div class="info-card">
+                    <h3>Taxonomic Group</h3>
+                    <p><?= htmlspecialchars($job['taxon']) ?></p>
+                </div>
+            </div>
+
+            <?php if ($subset): ?>
+                <div class="subset-info glass">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Analysis Subset:</strong> First <?= $subset ?> sequences
+                </div>
+            <?php endif; ?>
+
+            <div class="sequence-selector-container">
+                <label for="sequenceSelector">Select Sequence:</label>
+                <select id="sequenceSelector" class="glass">
+                    <?php foreach (array_keys($aa_data) as $id): ?>
+                        <option value="<?= htmlspecialchars($id) ?>"><?= htmlspecialchars($id) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="sequence-description">
+                <h3>Description:</h3>
+                <p id="currentDescription"><?= htmlspecialchars($descriptions[array_key_first($aa_data)] ?? 'No description available') ?></p>
+            </div>
+
+            <div id="aaChart" class="chart-container"></div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer glass">
+        <div class="footer-content">
+            <p>Created as part of the postgraduate course Introduction to Website and Database Design @ the University of Edinburgh, this website reflects coursework submitted for academic assessment.</p>
+            <a href="https://github.com/B269905-2024/web_project" target="_blank" class="github-link">
+                <i class="fab fa-github"></i> View the source code on GitHub
+            </a>
+        </div>
+    </footer>
 
     <script>
-        const aaData = <?= $aa_data_json ?>;
+        // Initialize particles.js background
+        particlesJS("particles-js", {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: "#8d9db6" },
+                shape: { type: "circle" },
+                opacity: { value: 0.5, random: true },
+                size: { value: 3, random: true },
+                line_linked: { enable: true, distance: 150, color: "#8d9db6", opacity: 0.2, width: 1 },
+                move: { enable: true, speed: 2, direction: "none", random: true, straight: false, out_mode: "out" }
+            },
+            interactivity: {
+                detect_on: "canvas",
+                events: {
+                    onhover: { enable: true, mode: "grab" },
+                    onclick: { enable: true, mode: "push" }
+                }
+            }
+        });
 
-        function updateChart(selectedId) {
-            const data = [{
-                x: Object.keys(aaData[selectedId]),
-                y: Object.values(aaData[selectedId]),
-                type: 'bar',
-                marker: { color: '#007BFF' }
-            }];
-
-            const layout = {
-                title: `Amino Acid Composition: ${selectedId}`,
-                xaxis: { title: 'Amino Acid' },
-                yaxis: { title: 'Percentage (%)' },
-                hovermode: 'closest'
-            };
-
-            Plotly.react('aaChart', data, layout);
+        // Dark Mode Management
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const body = document.body;
+        
+        // Initialize dark mode from localStorage
+        function initDarkMode() {
+            const darkModePref = localStorage.getItem('darkMode');
+            if (darkModePref === 'disabled') {
+                body.classList.remove('dark-mode');
+            } else if (darkModePref === null) {
+                // Default to dark mode if no preference set
+                localStorage.setItem('darkMode', 'enabled');
+            }
         }
-
-        // Initial chart load
-        const initialId = Object.keys(aaData)[0];
-        updateChart(initialId);
-
-        // Update chart on selection change
-        document.getElementById('sequenceSelector').addEventListener('change', function(e) {
-            updateChart(e.target.value);
+        
+        // Toggle dark mode
+        function toggleDarkMode() {
+            body.classList.toggle('dark-mode');
+            const isDark = body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDark ? 'enabled' : 'disabled');
+            updateChartColors();
+        }
+        
+        // Chart Management
+        const aaData = <?= $aa_data_json ?>;
+        const descriptions = <?= $descriptions_json ?>;
+        const sequenceIds = Object.keys(aaData);
+        const aminoAcids = Object.keys(aaData[sequenceIds[0]]);
+        let currentChartId = sequenceIds[0];
+        let chartInstance = null;
+        
+        // Get current color scheme
+        function getColorScheme() {
+            return {
+                barColor: getComputedStyle(document.documentElement).getPropertyValue('--bar-color').trim(),
+                textColor: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim(),
+                gridColor: getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim()
+            };
+        }
+        
+        // Initialize the chart
+        function initChart() {
+            currentChartId = sequenceIds[0];
+            const colors = getColorScheme();
+            
+            const data = [{
+                x: aminoAcids,
+                y: Object.values(aaData[currentChartId]),
+                type: 'bar',
+                marker: { 
+                    color: colors.barColor,
+                    line: {
+                        color: colors.textColor,
+                        width: 1.5
+                    }
+                },
+                hoverinfo: 'y',
+                hovertemplate: '%{y:.2f}%<extra></extra>'
+            }];
+            
+            const layout = {
+                title: {
+                    text: `Amino Acid Composition: ${currentChartId}`,
+                    font: {
+                        color: colors.textColor,
+                        size: 18
+                    },
+                    x: 0.5,
+                    xanchor: 'center'
+                },
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                font: {
+                    color: colors.textColor,
+                    family: '"Helvetica Neue", Helvetica, Arial, sans-serif'
+                },
+                xaxis: { 
+                    title: {
+                        text: 'Amino Acid',
+                        font: {
+                            color: colors.textColor,
+                            size: 14
+                        }
+                    },
+                    tickfont: {
+                        color: colors.textColor,
+                        size: 12
+                    },
+                    gridcolor: colors.gridColor,
+                    tickangle: -45,
+                    fixedrange: true
+                },
+                yaxis: { 
+                    title: {
+                        text: 'Percentage (%)',
+                        font: {
+                            color: colors.textColor,
+                            size: 14
+                        }
+                    },
+                    tickfont: {
+                        color: colors.textColor,
+                        size: 12
+                    },
+                    gridcolor: colors.gridColor,
+                    range: [0, Math.max(...Object.values(aaData[currentChartId])) * 1.1],
+                    fixedrange: true
+                },
+                hoverlabel: {
+                    bgcolor: colors.barColor,
+                    font: {
+                        color: '#ffffff'
+                    }
+                },
+                margin: { t: 80, l: 80, r: 40, b: 100 },
+                showlegend: false,
+                transition: {
+                    duration: 300,
+                    easing: 'cubic-in-out'
+                }
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false,
+                modeBarButtonsToRemove: ['toImage', 'sendDataToCloud'],
+                scrollZoom: false
+            };
+            
+            chartInstance = Plotly.newPlot('aaChart', data, layout, config);
+            
+            // Set initial description
+            document.getElementById('currentDescription').textContent = 
+                descriptions[currentChartId] || 'No description available';
+        }
+        
+        // Update chart colors when mode changes
+        function updateChartColors() {
+            if (!chartInstance) return;
+            
+            const colors = getColorScheme();
+            const update = {
+                marker: { color: colors.barColor }
+            };
+            
+            const layoutUpdate = {
+                title: { font: { color: colors.textColor } },
+                font: { color: colors.textColor },
+                xaxis: { 
+                    title: { font: { color: colors.textColor } },
+                    tickfont: { color: colors.textColor },
+                    gridcolor: colors.gridColor 
+                },
+                yaxis: { 
+                    title: { font: { color: colors.textColor } },
+                    tickfont: { color: colors.textColor },
+                    gridcolor: colors.gridColor 
+                },
+                hoverlabel: { bgcolor: colors.barColor }
+            };
+            
+            Plotly.update('aaChart', update, layoutUpdate);
+        }
+        
+        // Update chart when sequence selection changes
+        function updateChart(sequenceId) {
+            currentChartId = sequenceId;
+            const colors = getColorScheme();
+            
+            // Update description
+            document.getElementById('currentDescription').textContent = 
+                descriptions[currentChartId] || 'No description available';
+            
+            Plotly.react('aaChart', [{
+                x: aminoAcids,
+                y: Object.values(aaData[currentChartId]),
+                type: 'bar',
+                marker: { 
+                    color: colors.barColor,
+                    line: {
+                        color: colors.textColor,
+                        width: 1.5
+                    }
+                },
+                hoverinfo: 'y',
+                hovertemplate: '%{y:.2f}%<extra></extra>'
+            }], {
+                title: {
+                    text: `Amino Acid Composition: ${currentChartId}`,
+                    font: { color: colors.textColor }
+                },
+                yaxis: {
+                    range: [0, Math.max(...Object.values(aaData[currentChartId])) * 1.1]
+                }
+            });
+        }
+        
+        // Initialize everything when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initDarkMode();
+            initChart();
+            
+            // Set up event listeners
+            darkModeToggle.addEventListener('click', toggleDarkMode);
+            
+            document.getElementById('sequenceSelector').addEventListener('change', function(e) {
+                updateChart(e.target.value);
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                Plotly.Plots.resize('aaChart');
+            });
         });
     </script>
 </body>

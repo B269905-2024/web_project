@@ -1,0 +1,194 @@
+/* Inherit from general.css */
+@import url('general.css');
+
+/* Analysis Container */
+.analysis-container {
+    border-radius: 1rem;
+    padding: 2.5rem;
+    width: 100%;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+    max-width: 1200px;
+}
+
+.analysis-container h1 {
+    color: var(--primary);
+    font-size: var(--text-xl);
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--accent);
+}
+
+/* Job Info Cards */
+.job-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.info-card {
+    background: var(--glass);
+    border-radius: 0.8rem;
+    padding: 1.5rem;
+    transition: transform 0.3s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.info-card h3 {
+    color: var(--primary);
+    font-size: var(--text-base);
+    margin-bottom: 0.5rem;
+}
+
+.info-card p {
+    font-size: var(--text-sm);
+    color: var(--text);
+    word-break: break-word;
+}
+
+/* Subset Info */
+.subset-info {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: var(--text-sm);
+}
+
+.subset-info i {
+    font-size: var(--text-base);
+    color: var(--primary);
+}
+
+/* Sequence Selector */
+.sequence-selector-container {
+    margin-bottom: 2rem;
+}
+
+.sequence-selector-container label {
+    display: block;
+    margin-bottom: 0.8rem;
+    font-weight: 500;
+    color: var(--text);
+    font-size: var(--text-sm);
+}
+
+#sequenceSelector {
+    width: 100%;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    transition: all 0.3s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1em;
+}
+
+#sequenceSelector:focus {
+    outline: none;
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 2px rgba(var(--primary), 0.2);
+}
+
+/* Chart Container */
+.chart-container {
+    width: 100%;
+    height: 600px;
+    border-radius: 0.8rem;
+    overflow: hidden;
+    background: var(--glass);
+    margin-top: 1.5rem;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.8rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.action-btn {
+    background: var(--primary);
+    color: white;
+}
+
+.action-btn:hover {
+    background: var(--secondary);
+    transform: translateY(-2px);
+}
+
+.action-btn.secondary {
+    background: var(--accent);
+}
+
+.action-btn.secondary:hover {
+    background: var(--secondary);
+}
+
+.action-btn i {
+    font-size: var(--text-sm);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .analysis-container {
+        padding: 1.5rem;
+    }
+    
+    .job-info {
+        grid-template-columns: 1fr;
+    }
+    
+    .chart-container {
+        height: 450px;
+    }
+}
+
+@media (max-width: 480px) {
+    .analysis-container {
+        padding: 1.2rem;
+    }
+    
+    .analysis-container h1 {
+        font-size: var(--text-lg);
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .chart-container {
+        height: 350px;
+    }
+}
