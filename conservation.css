@@ -30,15 +30,8 @@
 }
 
 .job-info p {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
     font-size: var(--text-sm);
     color: var(--text);
-}
-
-.job-info i {
-    color: var(--primary);
 }
 
 .conservation-grid {
@@ -71,9 +64,6 @@
 .card-header h2 {
     font-size: var(--text-lg);
     color: var(--primary);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 .download-buttons {
@@ -86,9 +76,6 @@
     border-radius: 0.5rem;
     font-size: var(--text-xs);
     text-decoration: none;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
     transition: all 0.3s ease;
 }
 
@@ -177,9 +164,6 @@
     font-size: var(--text-base);
     color: var(--primary);
     margin-bottom: 0.8rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 .guide-section ul {
@@ -198,6 +182,28 @@
     color: var(--primary);
     position: absolute;
     left: 0;
+}
+
+/* Back to Results Button Styles */
+.back-to-results-container {
+    max-width: 1400px;
+    margin: 1rem auto;
+    padding: 0 2rem;
+}
+
+.back-to-results-btn {
+    display: inline-block;
+    padding: 0.8rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    transition: background 0.3s ease;
+}
+
+.back-to-results-btn:hover {
+    background: var(--secondary);
 }
 
 /* Responsive Design */
@@ -231,6 +237,10 @@
         width: 100%;
         justify-content: flex-end;
     }
+
+    .back-to-results-container {
+        padding: 0 1rem;
+    }
 }
 
 @media (max-width: 480px) {
@@ -254,5 +264,62 @@
     .download-btn {
         flex-grow: 1;
         justify-content: center;
+    }
+
+    .back-to-results-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+}
+/* Back to Results Card - Small and Left-Aligned */
+.back-to-results-container {
+    position: absolute;
+    left: 2rem;
+    top: 1rem;
+    z-index: 1;
+}
+
+.back-to-results-card {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 0.5rem;
+    font-size: var(--text-xs);
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.back-to-results-card:hover {
+    background: var(--secondary);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+
+.conservation-header {
+    position: relative; /* Needed for absolute positioning of back button */
+    padding: 1.5rem 2rem;
+}
+
+.header-content {
+    text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .back-to-results-container {
+        left: 1rem;
+        top: 0.5rem;
+    }
+
+    .back-to-results-card {
+        padding: 0.4rem 0.8rem;
+        font-size: var(--text-xxs);
+    }
+
+    .conservation-header {
+        padding: 1rem 1.5rem 1rem 3.5rem; /* Extra left padding for mobile */
     }
 }

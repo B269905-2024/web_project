@@ -360,10 +360,17 @@ if (!empty(array_column($results, 'plotcon_score'))) {
             </div>
         </div>
     </nav>
-
-    <!-- Main Content -->
-    <main class="conservation-content">
-        <div class="conservation-header glass">
+<!-- Main Content -->
+<main class="conservation-content">
+    <div class="conservation-header glass">
+        <!-- Back to Results Card - Small and on left -->
+        <div class="back-to-results-container">
+            <a href="results.php?job_id=<?php echo $job_id; ?>" class="back-to-results-card">
+                Back to Results
+            </a>
+        </div>
+        
+        <div class="header-content">
             <h1>Conservation Analysis</h1>
             <div class="job-info">
                 <p><strong>Protein/Gene:</strong> <?php echo htmlspecialchars($job['search_term']); ?></p>
@@ -371,8 +378,9 @@ if (!empty(array_column($results, 'plotcon_score'))) {
                 <p><strong>Window Size:</strong> <?php echo $window_size; ?></p>
             </div>
         </div>
+    </div>
 
-        <div class="conservation-grid">
+	<div class="conservation-grid">
             <!-- Entropy Plot -->
             <div class="analysis-card glass">
                 <div class="card-header">
