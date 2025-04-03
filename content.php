@@ -143,7 +143,6 @@ try {
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <style>
-        /* Dynamic colors that change with dark/light mode */
         :root {
             --bar-color-light: #667292;
             --bar-color-dark: #8d9db6;
@@ -151,18 +150,44 @@ try {
             --text-color-dark: #e1e8f0;
             --grid-color-light: rgba(0,0,0,0.1);
             --grid-color-dark: rgba(255,255,255,0.1);
+            --chart-bg-dark: rgba(26, 34, 46, 0.7);
+            --chart-bg-light: rgba(255, 255, 255, 0.7);
+            --hover-bg-dark: rgba(141, 157, 182, 0.8);
+            --hover-bg-light: rgba(102, 114, 146, 0.8);
         }
         
         body.dark-mode {
             --bar-color: var(--bar-color-dark);
             --text-color: var(--text-color-dark);
             --grid-color: var(--grid-color-dark);
+            --chart-bg: var(--chart-bg-dark);
+            --hover-bg: var(--hover-bg-dark);
         }
         
         body:not(.dark-mode) {
             --bar-color: var(--bar-color-light);
             --text-color: var(--text-color-light);
             --grid-color: var(--grid-color-light);
+            --chart-bg: var(--chart-bg-light);
+            --hover-bg: var(--hover-bg-light);
+        }
+        
+        .chart-container {
+            background: var(--chart-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.8rem;
+        }
+        
+        .js-plotly-plot .plotly .modebar {
+            background: var(--chart-bg) !important;
+            border-radius: 0.5rem;
+            padding: 5px;
+        }
+        
+        .js-plotly-plot .plotly .modebar-btn svg {
+            fill: var(--text-color) !important;
         }
     </style>
 </head>
@@ -314,11 +339,13 @@ try {
             return {
                 barColor: getComputedStyle(document.documentElement).getPropertyValue('--bar-color').trim(),
                 textColor: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim(),
-                gridColor: getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim()
+                gridColor: getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim(),
+                chartBg: getComputedStyle(document.documentElement).getPropertyValue('--chart-bg').trim(),
+                hoverBg: getComputedStyle(document.documentElement).getPropertyValue('--hover-bg').trim()
             };
         }
         
-        // Initialize the chart
+        // Initialize the chart with dark background
         function initChart() {
             currentChartId = sequenceIds[0];
             const colors = getColorScheme();
@@ -348,8 +375,8 @@ try {
                     x: 0.5,
                     xanchor: 'center'
                 },
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: colors.chartBg,
+                paper_bgcolor: colors.chartBg,
                 font: {
                     color: colors.textColor,
                     family: '"Helvetica Neue", Helvetica, Arial, sans-serif'
@@ -368,7 +395,9 @@ try {
                     },
                     gridcolor: colors.gridColor,
                     tickangle: -45,
-                    fixedrange: true
+                    fixedrange: true,
+                    showline: true,
+                    linecolor: colors.gridColor
                 },
                 yaxis: { 
                     title: {
@@ -384,13 +413,17 @@ try {
                     },
                     gridcolor: colors.gridColor,
                     range: [0, Math.max(...Object.values(aaData[currentChartId])) * 1.1],
-                    fixedrange: true
+                    fixedrange: true,
+                    showline: true,
+                    linecolor: colors.gridColor
                 },
                 hoverlabel: {
-                    bgcolor: colors.barColor,
+                    bgcolor: colors.hoverBg,
                     font: {
-                        color: '#ffffff'
-                    }
+                        color: '#ffffff',
+                        size: 12
+                    },
+                    bordercolor: 'transparent'
                 },
                 margin: { t: 80, l: 80, r: 40, b: 100 },
                 showlegend: false,
@@ -405,7 +438,14 @@ try {
                 displayModeBar: true,
                 displaylogo: false,
                 modeBarButtonsToRemove: ['toImage', 'sendDataToCloud'],
-                scrollZoom: false
+                scrollZoom: false,
+                modeBarButtonsToAdd: [{
+                    name: 'Toggle Dark Mode',
+                    icon: Plotly.Icons.pencil,
+                    click: function(gd) {
+                        document.getElementById('darkModeToggle').click();
+                    }
+                }]
             };
             
             chartInstance = Plotly.newPlot('aaChart', data, layout, config);
@@ -425,19 +465,23 @@ try {
             };
             
             const layoutUpdate = {
+                plot_bgcolor: colors.chartBg,
+                paper_bgcolor: colors.chartBg,
                 title: { font: { color: colors.textColor } },
                 font: { color: colors.textColor },
                 xaxis: { 
                     title: { font: { color: colors.textColor } },
                     tickfont: { color: colors.textColor },
-                    gridcolor: colors.gridColor 
+                    gridcolor: colors.gridColor,
+                    linecolor: colors.gridColor
                 },
                 yaxis: { 
                     title: { font: { color: colors.textColor } },
                     tickfont: { color: colors.textColor },
-                    gridcolor: colors.gridColor 
+                    gridcolor: colors.gridColor,
+                    linecolor: colors.gridColor
                 },
-                hoverlabel: { bgcolor: colors.barColor }
+                hoverlabel: { bgcolor: colors.hoverBg }
             };
             
             Plotly.update('aaChart', update, layoutUpdate);
@@ -466,12 +510,17 @@ try {
                 hoverinfo: 'y',
                 hovertemplate: '%{y:.2f}%<extra></extra>'
             }], {
+                plot_bgcolor: colors.chartBg,
+                paper_bgcolor: colors.chartBg,
                 title: {
                     text: `Amino Acid Composition: ${currentChartId}`,
                     font: { color: colors.textColor }
                 },
                 yaxis: {
                     range: [0, Math.max(...Object.values(aaData[currentChartId])) * 1.1]
+                },
+                hoverlabel: {
+                    bgcolor: colors.hoverBg
                 }
             });
         }
