@@ -1,174 +1,99 @@
 <?php session_start(); ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About - Protein Sequence Analysis Tool</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .nav-links {
-            margin-bottom: 30px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #eee;
-        }
-        .nav-links a {
-            margin-right: 15px;
-            text-decoration: none;
-            color: #0366d6;
-        }
-        .nav-links a:hover {
-            text-decoration: underline;
-        }
-        h1 {
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
-        }
-        h2 {
-            color: #2980b9;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 8px;
-        }
-        .diagram {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-family: monospace;
-            white-space: pre;
-            overflow-x: auto;
-        }
-        .script-selector, .table-selector {
-            margin: 20px 0;
-        }
-        select {
-            padding: 8px;
-            font-size: 16px;
-            width: 300px;
-        }
-        .script-info, .table-info {
-            background-color: #e8f4f8;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }
-        .script-info h3, .table-info h3 {
-            margin-top: 0;
-            color: #2980b9;
-        }
-        .script-info ul {
-            margin-bottom: 0;
-        }
-        .database-table {
-            margin-bottom: 30px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            overflow: hidden;
-        }
-        .database-table h3 {
-            background-color: #3498db;
-            color: white;
-            margin: 0;
-            padding: 10px;
-            font-size: 16px;
-        }
-        .database-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .database-table th, .database-table td {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-        .database-table th {
-            background-color: #f2f2f2;
-        }
-        .database-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        .collapsible {
-            background-color: #3498db;
-            color: white;
-            cursor: pointer;
-            padding: 10px;
-            width: 100%;
-            border: none;
-            text-align: left;
-            outline: none;
-            font-size: 16px;
-            margin: 4px 0;
-            border-radius: 5px;
-        }
-        .collapsible:hover {
-            background-color: #2980b9;
-        }
-        .collapsible-content {
-            padding: 0 18px;
-            display: none;
-            overflow: hidden;
-            background-color: #f9f9f9;
-            border-radius: 0 0 5px 5px;
-            margin-bottom: 20px;
-        }
-        .collapsible.active {
-            border-radius: 5px 5px 0 0;
-        }
-    </style>
+    <link rel="icon" href="images/logo.png" type="image/png">
+    <link rel="stylesheet" href="general.css">
+    <link rel="stylesheet" href="about.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 </head>
-<body>
-    <div class="nav-links">
-        <a href="home.php">New Search</a>
-        <a href="past.php">Past Searches</a>
-        <a href="example.php">Example Analysis</a>
-        <a href="about.php">About</a>
-        <a href="help.php">Help</a>
-        <a href="credits.php">Credits</a>
-    </div>
+<body class="dark-mode">
+    <!-- Dark Mode Toggle -->
+    <button id="darkModeToggle" class="dark-mode-toggle">
+        <span class="toggle-icon"></span>
+    </button>
 
-    <h1>About the Protein Sequence Analysis Tool</h1>
+    <!-- Animated Background -->
+    <div id="particles-js"></div>
 
-    <h2>System Architecture Diagram</h2>
-    <div class="diagram">
-├── config.php (Shared configuration for all scripts)
-│
-├── Entry Points
-│   ├── home.php (Main search form)
-│   │   ├── run_search.sh (Background search processing)
-│   │   └── results.php (Displays search results)
-│   │       ├── conservation.php
-│   │       │   ├── run_conservation.sh
-│   │       │   └── download_conservation.php
-│   │       ├── motifs.php
-│   │       │   ├── run_motifs.sh
-│   │       │   └── download_motifs.php
-│   │       └── content.php
-│   ├── past.php (Past searches list)
-│   │   └── delete_job.php
-│   └── example.php (Permanent example analysis)
-│
-├── Utility Scripts
-│   ├── check_motifs.php (AJAX endpoint)
-│   └── download.php (Legacy download handler)
-│
-└── Documentation/Info
-    ├── about.php
-    ├── help.php
-    ├── credits.php
-    └── example.php
-    </div>
+    <!-- Top Navigation Bar -->
+    <nav class="top-bar glass">
+        <div class="logo-nav-container">
+            <a href="home.php" class="logo-tab">
+                <img src="images/full_logo.png" alt="Protein Analysis Suite" class="logo">
+                <span>Protein Analysis Suite</span>
+            </a>
 
-    <h2>Database Schema</h2>
-    <button type="button" class="collapsible">Show/Hide Database Schema</button>
-    <div class="collapsible-content">
-        <div class="diagram">
+            <div class="nav-links">
+                <a href="home.php" class="nav-link"><span>New Search</span></a>
+                <a href="past.php" class="nav-link"><span>Past Searches</span></a>
+                <a href="example.php" class="nav-link"><span>Example Analysis</span></a>
+                <a href="about.php" class="nav-link active"><span>About</span></a>
+                <a href="help.php" class="nav-link"><span>Help</span></a>
+                <a href="credits.php" class="nav-link"><span>Credits</span></a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="about-container glass">
+            <h1>About the Protein Sequence Analysis Tool</h1>
+
+            <h2>Implementation Overview</h2>
+            <p class="overview">The system follows a modular PHP architecture with a MySQL backend, implementing session-based user tracking and job processing. The frontend utilizes vanilla JavaScript for dynamic interactions while maintaining progressive enhancement. Database operations are normalized across 11 tables with proper foreign key relationships to ensure data integrity. Background processing is handled through shell scripts triggered by PHP, allowing long-running analysis tasks to complete asynchronously. The architecture separates concerns between data collection (NCBI queries), analysis (EMBOSS/Clustal tools), and visualization (Plotly.js), with each component storing results in dedicated database tables. AJAX endpoints provide real-time status updates without page reloads, and the system includes comprehensive error handling at both the application and database levels.</p>
+
+            <h2>System Architecture</h2>
+            <div class="diagram">
+├── config.php
+│
+├── CSS Files
+│   ├── about.css
+│   ├── conservation.css
+│   ├── content.css
+│   ├── credits.css
+│   ├── example.css
+│   ├── general.css
+│   ├── help.css
+│   ├── home.css
+│   ├── motifs.css
+│   ├── past.css
+│   └── results.css
+│
+├── PHP Scripts
+│   ├── about.php
+│   ├── conservation.php
+│   ├── content.php
+│   ├── credits.php
+│   ├── delete_job.php
+│   ├── download.php
+│   ├── download_conservation.php
+│   ├── example.php
+│   ├── help.php
+│   ├── home.php
+│   ├── motifs.php
+│   ├── past.php
+│   └── results.php
+│
+├── Shell Scripts
+│   ├── run_conservation.sh
+│   ├── run_motifs.sh
+│   └── run_search.sh
+│
+└── images/
+    ├── logo.png
+    └── full_logo.png
+            </div>
+
+            <h2>Database Schema</h2>
+            <button type="button" class="collapsible">Show/Hide Database Schema</button>
+            <div class="collapsible-content">
+                <div class="diagram-container">
+                    <div class="diagram">
 Database Schema:
 ┌───────────────────────────────┐
 │            users              │
@@ -239,61 +164,112 @@ Database Schema:
 ├───────────────┬───────────────┤
 │ result_id (PK)│ cons_id (FK)  │
 └───────────────┴───────────────┘
+                    </div>
+                </div>
+            </div>
+
+            <h3>Database Tables</h3>
+            <div class="selector-container glass">
+                <select id="tableSelector" onchange="showTableInfo()">
+                    <option value="">-- Select a table to view details --</option>
+                    <option value="users">users</option>
+                    <option value="jobs">jobs</option>
+                    <option value="sequences">sequences</option>
+                    <option value="motif_jobs">motif_jobs</option>
+                    <option value="motif_results">motif_results</option>
+                    <option value="motif_reports">motif_reports</option>
+                    <option value="conservation_jobs">conservation_jobs</option>
+                    <option value="conservation_alignments">conservation_alignments</option>
+                    <option value="conservation_results">conservation_results</option>
+                    <option value="conservation_reports">conservation_reports</option>
+                    <option value="temp_fasta">temp_fasta</option>
+                </select>
+            </div>
+
+            <div id="tableInfo" class="info-container glass" style="display:none;">
+                <h3 id="tableTitle"></h3>
+                <div id="tableDetails"></div>
+            </div>
+
+            <h3>Script Descriptions</h3>
+            <div class="selector-container glass">
+                <select id="scriptSelector" onchange="showScriptInfo()">
+                    <option value="">-- Select a script to learn more --</option>
+                    <option value="home.php">home.php</option>
+                    <option value="run_search.sh">run_search.sh</option>
+                    <option value="results.php">results.php</option>
+                    <option value="conservation.php">conservation.php</option>
+                    <option value="run_conservation.sh">run_conservation.sh</option>
+                    <option value="motifs.php">motifs.php</option>
+                    <option value="run_motifs.sh">run_motifs.sh</option>
+                    <option value="content.php">content.php</option>
+                    <option value="past.php">past.php</option>
+                    <option value="delete_job.php">delete_job.php</option>
+                    <option value="example.php">example.php</option>
+                    <option value="download.php">download.php</option>
+                </select>
+            </div>
+
+            <div id="scriptInfo" class="info-container glass" style="display:none;">
+                <h3 id="scriptTitle"></h3>
+                <ul id="scriptDetails"></ul>
+            </div>
         </div>
-    </div>
+    </main>
 
-    <h3>Implementation Overview</h3>
-    <p>The system follows a modular PHP architecture with a MySQL backend, implementing session-based user tracking and job processing. The frontend utilizes vanilla JavaScript for dynamic interactions while maintaining progressive enhancement. Database operations are normalized across 11 tables with proper foreign key relationships to ensure data integrity. Background processing is handled through shell scripts triggered by PHP, allowing long-running analysis tasks to complete asynchronously. The architecture separates concerns between data collection (NCBI queries), analysis (EMBOSS/Clustal tools), and visualization (Plotly.js), with each component storing results in dedicated database tables. AJAX endpoints provide real-time status updates without page reloads, and the system includes comprehensive error handling at both the application and database levels.</p>
-
-    <h3>Database Tables</h3>
-    <div class="table-selector">
-        <select id="tableSelector" onchange="showTableInfo()">
-            <option value="">-- Select a table to view details --</option>
-            <option value="users">users</option>
-            <option value="jobs">jobs</option>
-            <option value="sequences">sequences</option>
-            <option value="motif_jobs">motif_jobs</option>
-            <option value="motif_results">motif_results</option>
-            <option value="motif_reports">motif_reports</option>
-            <option value="conservation_jobs">conservation_jobs</option>
-            <option value="conservation_alignments">conservation_alignments</option>
-            <option value="conservation_results">conservation_results</option>
-            <option value="conservation_reports">conservation_reports</option>
-            <option value="temp_fasta">temp_fasta</option>
-        </select>
-    </div>
-
-    <div id="tableInfo" class="table-info" style="display:none;">
-        <h3 id="tableTitle"></h3>
-        <div id="tableDetails"></div>
-    </div>
-
-    <h2>Script Descriptions</h2>
-    <div class="script-selector">
-        <select id="scriptSelector" onchange="showScriptInfo()">
-            <option value="">-- Select a script to learn more --</option>
-            <option value="home.php">home.php</option>
-            <option value="run_search.sh">run_search.sh</option>
-            <option value="results.php">results.php</option>
-            <option value="conservation.php">conservation.php</option>
-            <option value="run_conservation.sh">run_conservation.sh</option>
-            <option value="motifs.php">motifs.php</option>
-            <option value="run_motifs.sh">run_motifs.sh</option>
-            <option value="content.php">content.php</option>
-            <option value="past.php">past.php</option>
-            <option value="delete_job.php">delete_job.php</option>
-            <option value="example.php">example.php</option>
-            <option value="check_motifs.php">check_motifs.php</option>
-            <option value="download.php">download.php</option>
-        </select>
-    </div>
-
-    <div id="scriptInfo" class="script-info" style="display:none;">
-        <h3 id="scriptTitle"></h3>
-        <ul id="scriptDetails"></ul>
-    </div>
+    <!-- Footer -->
+    <footer class="footer glass">
+        <div class="footer-content">
+            <p>Created as part of the postgraduate course Introduction to Website and Database Design @ the University of Edinburgh, this website reflects coursework submitted for academic assessment.</p>
+            <a href="https://github.com/B269905-2024/web_project" target="_blank" class="github-link">
+                <i class="fab fa-github"></i> View the source code on GitHub
+            </a>
+        </div>
+    </footer>
 
     <script>
+        // Initialize particles.js background
+        particlesJS("particles-js", {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: "#8d9db6" },
+                shape: { type: "circle" },
+                opacity: { value: 0.5, random: true },
+                size: { value: 3, random: true },
+                line_linked: { enable: true, distance: 150, color: "#8d9db6", opacity: 0.2, width: 1 },
+                move: { enable: true, speed: 2, direction: "none", random: true, straight: false, out_mode: "out" }
+            },
+            interactivity: {
+                detect_on: "canvas",
+                events: {
+                    onhover: { enable: true, mode: "grab" },
+                    onclick: { enable: true, mode: "push" }
+                }
+            }
+        });
+
+        // Dark Mode Toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const body = document.body;
+
+        darkModeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+
+            if (body.classList.contains('dark-mode')) {
+                localStorage.setItem('darkMode', 'enabled');
+            } else {
+                localStorage.setItem('darkMode', 'disabled');
+            }
+        });
+
+        // Set dark mode as default if not set
+        if (!localStorage.getItem('darkMode')) {
+            localStorage.setItem('darkMode', 'enabled');
+            body.classList.add('dark-mode');
+        } else if (localStorage.getItem('darkMode') === 'disabled') {
+            body.classList.remove('dark-mode');
+        }
+
         // Table data
         const tableData = {
             "users": {
@@ -441,7 +417,7 @@ Database Schema:
             // Create table
             const table = document.createElement('table');
             table.className = 'database-table';
-            
+
             // Create header
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
@@ -452,7 +428,7 @@ Database Schema:
             });
             thead.appendChild(headerRow);
             table.appendChild(thead);
-            
+
             // Create body
             const tbody = document.createElement('tbody');
             tableData[tableName].fields.forEach(field => {
@@ -465,7 +441,7 @@ Database Schema:
                 tbody.appendChild(row);
             });
             table.appendChild(tbody);
-            
+
             detailsDiv.appendChild(table);
             infoDiv.style.display = 'block';
         }
@@ -536,12 +512,6 @@ Database Schema:
                 "Shows all analysis types pre-computed",
                 "Uses fixed job ID (90)",
                 "Helpful for demonstration purposes"
-            ],
-            "check_motifs.php": [
-                "AJAX endpoint for motif status",
-                "Checks if motif analysis is complete",
-                "Returns JSON response",
-                "Used by motifs.php for progress checking"
             ],
             "download.php": [
                 "Legacy download handler",

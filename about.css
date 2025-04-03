@@ -1,0 +1,249 @@
+/* About Page Specific Styles */
+@import url('general.css');
+
+/* Main Content Container */
+.about-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem;
+    border-radius: 1rem;
+}
+
+.about-container h1 {
+    color: var(--primary);
+    margin-bottom: 2rem;
+    text-align: center;
+    font-size: var(--text-xl);
+    position: relative;
+    padding-bottom: 1rem;
+}
+
+.about-container h1::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 3px;
+    background: var(--primary);
+    border-radius: 3px;
+}
+
+.about-container h2,
+.about-container h3 {
+    color: var(--primary);
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent);
+}
+
+.about-container p.overview {
+    margin-bottom: 2rem;
+    line-height: 1.8;
+    text-align: justify;
+}
+
+/* Diagram Styles */
+.diagram {
+    font-family: monospace;
+    white-space: pre;
+    overflow-x: auto;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    border-radius: 0.8rem;
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Selector Containers */
+.selector-container {
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    border-radius: 0.8rem;
+}
+
+.selector-container select {
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: 0.5rem;
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--accent);
+}
+
+/* Info Containers */
+.info-container {
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    border-radius: 0.8rem;
+}
+
+.info-container h3 {
+    margin-top: 0;
+    color: var(--secondary);
+}
+
+/* Database Table Styles */
+.database-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.database-table th,
+.database-table td {
+    padding: 0.8rem;
+    border: 1px solid var(--accent);
+    text-align: left;
+}
+
+.database-table th {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--primary);
+}
+
+.database-table tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Collapsible Styles */
+.collapsible {
+    background: var(--primary);
+    color: white;
+    cursor: pointer;
+    padding: 1rem;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: var(--text-sm);
+    margin: 0.5rem 0;
+    border-radius: 0.5rem;
+    transition: background 0.3s ease;
+}
+
+.collapsible:hover {
+    background: var(--secondary);
+}
+
+.collapsible.active {
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.collapsible-content {
+    display: none;
+    overflow: hidden;
+    border-radius: 0 0 0.5rem 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* List Styles */
+.info-container ul {
+    padding-left: 1.5rem;
+    margin: 1rem 0;
+}
+
+.info-container li {
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .about-container {
+        padding: 1.5rem;
+    }
+    
+    .about-container h1 {
+        font-size: var(--text-lg);
+    }
+}
+
+@media (max-width: 480px) {
+    .about-container {
+        padding: 1rem;
+    }
+    
+    .database-table th,
+    .database-table td {
+        padding: 0.5rem;
+        font-size: var(--text-xs);
+    }
+}
+/* Diagram Container */
+.diagram-container {
+    display: flex;
+    justify-content: center;
+    margin: 1.5rem 0;
+}
+/* Diagram Styles */
+.diagram {
+    font-family: monospace;
+    white-space: pre;
+    overflow-x: auto;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    border-radius: 0.8rem;
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    max-width: 100%;
+}
+
+/* Collapsible Styles */
+.collapsible {
+    background: var(--primary);
+    color: white;
+    cursor: pointer;
+    padding: 1rem;
+    width: 100%;
+    border: none;
+    text-align: center;
+    outline: none;
+    font-size: var(--text-sm);
+    margin: 0.5rem 0;
+    border-radius: 0.5rem;
+    transition: background 0.3s ease;
+}
+
+.collapsible:hover {
+    background: var(--secondary);
+}
+
+.collapsible-content {
+    display: none;
+    overflow: hidden;
+    margin: 0.5rem 0 1.5rem;
+}
+
+.collapsible-content .diagram {
+    background: var(--card);
+    margin: 0;
+    padding: 1.5rem;
+}
+/* Diagram Container */
+.diagram-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    overflow-x: auto;
+}
+
+/* Diagram Styles */
+.diagram {
+    font-family: monospace;
+    white-space: pre;
+    padding: 1.5rem;
+    margin: 0;
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.8rem;
+}
+
+/* Collapsible Content */
+.collapsible-content {
+    display: none;
+    overflow: hidden;
+    width: 100%;
+    margin: 0.5rem 0 1.5rem;
+}
