@@ -193,14 +193,6 @@ ob_start();
 <html>
 <head>
     <title>Motif Analysis</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; }
-        .sequence { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; }
-        .motif { background-color: #f5f5f5; padding: 10px; margin: 10px 0; }
-        .highlight { background-color: #ffeb3b; padding: 2px; }
-        pre { background-color: #f5f5f5; padding: 10px; overflow-x: auto; }
-        .toggle { color: blue; cursor: pointer; }
-    </style>
 </head>
 <body>
     <div>
@@ -213,7 +205,7 @@ ob_start();
         <h1>Motif Analysis: <?= htmlspecialchars($job['search_term'] ?? 'Unknown') ?></h1>
         
         <?php if (isset($_SESSION['error'])): ?>
-            <div style="color: red; margin-bottom: 20px;">
+            <div>
                 <?= htmlspecialchars($_SESSION['error']) ?>
             </div>
             <?php unset($_SESSION['error']); ?>
@@ -238,9 +230,9 @@ ob_start();
                 $has_motifs = !empty($seq_motifs);
                 $report = $sequence_reports[$seq['ncbi_id']] ?? ['hitcount' => 0];
             ?>
-                <div class="sequence">
+                <div>
                     <h3><?= htmlspecialchars($seq['ncbi_id']) ?> 
-                        <span style="font-weight:normal">(<?= $has_motifs ? count($seq_motifs) . ' motifs' : 'No motifs' ?>)</span>
+                        <span>(<?= $has_motifs ? count($seq_motifs) . ' motifs' : 'No motifs' ?>)</span>
                     </h3>
                     
                     <?php if ($has_motifs): ?>
@@ -251,15 +243,15 @@ ob_start();
                             $highlight_start = $motif['start_pos'] - $start - 1;
                             $highlight_length = $motif['end_pos'] - $motif['start_pos'] + 1;
                         ?>
-                            <div class="motif">
+                            <div>
                                 <div><strong><?= htmlspecialchars($motif['motif_name']) ?></strong></div>
                                 <div>Positions: <?= $motif['start_pos'] ?> to <?= $motif['end_pos'] ?></div>
-                                <div style="font-family: monospace; margin: 5px 0;">
+                                <div>
                                     <?= substr($segment, 0, $highlight_start) ?>
-                                    <span class="highlight"><?= substr($segment, $highlight_start, $highlight_length) ?></span>
+                                    <span><?= substr($segment, $highlight_start, $highlight_length) ?></span>
                                     <?= substr($segment, $highlight_start + $highlight_length) ?>
                                 </div>
-                                <div style="font-family: monospace; color: #666;">
+                                <div>
                                     <?= str_repeat('&nbsp;', $highlight_start) ?>
                                     <?= str_repeat('^', $highlight_length) ?>
                                 </div>
@@ -271,7 +263,7 @@ ob_start();
 
                     <?php if (!empty($report['output'])): ?>
                         <div>
-                            <span class="toggle" onclick="toggleOutput('output-<?= $seq['sequence_id'] ?>')">
+                            <span onclick="toggleOutput('output-<?= $seq['sequence_id'] ?>')">
                                 ▶ Show analysis details
                             </span>
                             <pre id="output-<?= $seq['sequence_id'] ?>" style="display:none"><?= htmlspecialchars($report['output']) ?></pre>
