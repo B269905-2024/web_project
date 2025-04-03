@@ -140,3 +140,165 @@
         padding: 1.2rem;
     }
 }
+/* Past Searches Page Styles */
+.past-searches-container {
+    border-radius: 1rem;
+    padding: 2rem;
+    width: 100%;
+}
+
+.past-searches-container h1 {
+    color: var(--primary);
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.no-searches {
+    padding: 2rem;
+    text-align: center;
+    border-radius: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.no-searches p {
+    margin: 0;
+    font-size: var(--text-base);
+}
+
+.jobs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.job-card {
+    padding: 1.2rem;
+    border-radius: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.job-content {
+    flex-grow: 1;
+}
+
+.job-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+}
+
+.job-header h3 {
+    margin: 0;
+    font-size: var(--text-base);
+    color: var(--primary);
+}
+
+.job-date {
+    font-size: var(--text-sm);
+    color: var(--text);
+    opacity: 0.8;
+}
+
+.job-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--text-sm);
+}
+
+.detail-label {
+    font-weight: 500;
+    color: var(--text);
+}
+
+.detail-value {
+    color: var(--text);
+    opacity: 0.9;
+}
+
+.job-actions {
+    display: flex;
+    gap: 0.8rem;
+    flex-shrink: 0;
+}
+
+.action-btn {
+    padding: 0.6rem 1rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: none;
+}
+
+.view-btn {
+    background: var(--primary);
+    color: white;
+}
+
+.view-btn:hover {
+    background: var(--secondary);
+}
+
+.delete-btn {
+    background: #e74c3c;
+    color: white;
+}
+
+.delete-btn:hover {
+    background: #c0392b;
+}
+
+.delete-form {
+    margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .job-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .job-actions {
+        align-self: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .job-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.3rem;
+    }
+
+    .job-details {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .job-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}

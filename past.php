@@ -94,18 +94,20 @@ try {
                 <div class="jobs-list">
                     <?php foreach ($past_jobs as $job): ?>
                         <div class="job-card glass">
-                            <div class="job-header">
-                                <h3><?php echo htmlspecialchars($job['search_term']); ?> in <?php echo htmlspecialchars($job['taxon']); ?></h3>
-                                <span class="job-date"><?php echo date('M j, Y g:i a', strtotime($job['created_at'])); ?></span>
-                            </div>
-                            <div class="job-details">
-                                <div class="detail-item">
-                                    <span class="detail-label">Max Results:</span>
-                                    <span class="detail-value"><?php echo $job['max_results']; ?></span>
+                            <div class="job-content">
+                                <div class="job-header">
+                                    <h3><?php echo htmlspecialchars($job['search_term']); ?> in <?php echo htmlspecialchars($job['taxon']); ?></h3>
+                                    <span class="job-date"><?php echo date('M j, Y g:i a', strtotime($job['created_at'])); ?></span>
                                 </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Sequences Found:</span>
-                                    <span class="detail-value"><?php echo $job['sequence_count']; ?></span>
+                                <div class="job-details">
+                                    <div class="detail-item">
+                                        <span class="detail-label">Max Results:</span>
+                                        <span class="detail-value"><?php echo $job['max_results']; ?></span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Sequences Found:</span>
+                                        <span class="detail-value"><?php echo $job['sequence_count']; ?></span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="job-actions">
@@ -161,7 +163,7 @@ try {
 
         darkModeToggle.addEventListener('click', () => {
             body.classList.toggle('dark-mode');
-            
+
             if (body.classList.contains('dark-mode')) {
                 localStorage.setItem('darkMode', 'enabled');
             } else {
