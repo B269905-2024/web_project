@@ -1,214 +1,131 @@
 <?php
-require_once 'login.php';
+session_start();
 
-if (!isset($_GET['job_id'])) {
-    die("No job ID provided.");
+if (!isset($_COOKIE['protein_search_session']) || empty($_GET['job_id']) || !is_numeric($_GET['job_id'])) {
+    header("Location: home.php");
+    exit();
 }
 
-$job_id = $_GET['job_id'];
-$is_subset = isset($_GET['subset']) ? 1 : 0;
+$job_id = (int)$_GET['job_id'];
+$subset = isset($_GET['subset']) ? (int)$_GET['subset'] : null;
+
+require_once 'config.php';
 
 try {
-    // Connect to database
-    $pdo = new PDO("mysql:host=$hostname;dbname=$database", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
-    // Get job details and sequences
-    $stmt = $pdo->prepare("SELECT protein_family, taxonomic_group, 
-                          COALESCE(subset_sequences, sequences) AS sequences
-                          FROM searches WHERE job_id = ?");
-    $stmt->execute([$job_id]);
-    $row = $stmt->fetch();
-    
-    if (!$row) {
-        die("No job found.");
+    $pdo = new PDO("mysql:host=$hostname;dbname=$database;charset=utf8mb4", $username, $password, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ]);
+
+    // Verify user owns this job
+    $stmt = $pdo->prepare("SELECT j.* FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ? AND u.session_id = ?");
+    $stmt->execute([$job_id, $_COOKIE['protein_search_session']]);
+    $job = $stmt->fetch();
+
+    if (!$job) {
+        header("Location: home.php");
+        exit();
     }
 
-    // Check if content analysis already exists
-    $analysis_stmt = $pdo->prepare("SELECT * FROM content_analyses 
-                                   WHERE job_id = ? AND is_subset = ?");
-    $analysis_stmt->execute([$job_id, $is_subset]);
-    $analysis = $analysis_stmt->fetch();
-    
-    $amino_acids = str_split('ACDEFGHIKLMNPQRSTVWY'); // Standard amino acids
-    
-    if (!$analysis) {
-        // Parse sequences from database content
-        $fasta_content = $row['sequences'];
-        $sequences = [];
-        $current_id = '';
-        $current_seq = '';
-        
-        $lines = explode("\n", $fasta_content);
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (str_starts_with($line, '>')) {
-                if ($current_id !== '') {
-                    $sequences[$current_id] = $current_seq;
-                }
-                $current_id = substr($line, 1); // Remove '>'
-                $current_seq = '';
-            } else {
-                $current_seq .= strtoupper($line);
-            }
+    // Check if we need to generate a report
+    if (isset($_GET['generate_report'])) {
+        header('Content-Type: text/plain');
+        header('Content-Disposition: attachment; filename="aa_content_report_' . $job_id . '.txt"');
+
+        // Get sequences for this job
+        $sql = "SELECT ncbi_id, description, sequence FROM sequences WHERE job_id = ?";
+        if ($subset) {
+            $sql .= " LIMIT ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$job_id, $subset]);
+        } else {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$job_id]);
         }
-        if ($current_id !== '') {
-            $sequences[$current_id] = $current_seq;
+        $sequences = $stmt->fetchAll();
+
+        // Basic report header
+        echo "Amino Acid Content Analysis Report\n";
+        echo "=================================\n\n";
+        echo "Job ID: $job_id\n";
+        echo "Search Term: " . $job['search_term'] . "\n";
+        echo "Taxonomic Group: " . $job['taxon'] . "\n";
+        echo "Date: " . date('Y-m-d H:i:s') . "\n";
+        if ($subset) {
+            echo "Subset: First $subset sequences\n";
         }
-        
-        // Calculate amino acid percentages
-        $aa_data = [];
-        $analysis_data = [];
-        
-        foreach ($sequences as $id => $seq) {
-            $total = strlen($seq);
+        echo "\n";
+
+        $amino_acids = str_split('ACDEFGHIKLMNPQRSTVWY');
+
+        // Generate report content
+        foreach ($sequences as $seq) {
+            $id = $seq['ncbi_id'];
+            $sequence = strtoupper($seq['sequence']);
+            $total = strlen($sequence);
             $counts = array_fill_keys($amino_acids, 0);
-            
-            foreach (str_split($seq) as $aa) {
+
+            foreach (str_split($sequence) as $aa) {
                 if (isset($counts[$aa])) {
                     $counts[$aa]++;
                 }
             }
-            
-            $percentages = [];
+
+            echo "Sequence: $id\n";
+            echo "Description: " . $seq['description'] . "\n";
+            echo "Length: $total amino acids\n";
+            echo "Amino Acid Composition:\n";
+
             foreach ($counts as $aa => $count) {
-                $percentages[$aa] = $total > 0 ? ($count / $total) * 100 : 0;
+                $percentage = $total > 0 ? ($count / $total) * 100 : 0;
+                echo sprintf("  %s: %6.2f%% (%d/%d)\n", $aa, $percentage, $count, $total);
             }
-            
-            $aa_data[$id] = $percentages;
-            $analysis_data[] = [
-                'sequence_id' => $id,
-                'sequence_length' => $total,
-                'amino_acid_counts' => json_encode($counts),
-                'amino_acid_percentages' => json_encode($percentages)
-            ];
-        }
-        
-        // Store analysis in database
-        $insert_stmt = $pdo->prepare("INSERT INTO content_analyses 
-                                    (job_id, is_subset, sequences_analyzed, analysis_data, created_at)
-                                    VALUES (?, ?, ?, ?, NOW())");
-        $insert_stmt->execute([
-            $job_id, 
-            $is_subset,
-            count($sequences),
-            json_encode($analysis_data)
-        ]);
-        
-        $analysis_id = $pdo->lastInsertId();
-        
-        // Store individual sequence results
-        foreach ($analysis_data as $data) {
-            $seq_stmt = $pdo->prepare("INSERT INTO content_results
-                                     (analysis_id, job_id, sequence_id, sequence_length, 
-                                      amino_acid_counts, amino_acid_percentages)
-                                     VALUES (?, ?, ?, ?, ?, ?)");
-            $seq_stmt->execute([
-                $analysis_id,
-                $job_id,
-                $data['sequence_id'],
-                $data['sequence_length'],
-                $data['amino_acid_counts'],
-                $data['amino_acid_percentages']
-            ]);
-        }
-        
-        // Refresh analysis data
-        $analysis_stmt->execute([$job_id, $is_subset]);
-        $analysis = $analysis_stmt->fetch();
-    }
-    
-    // Handle report generation
-    if (isset($_GET['generate_report'])) {
-        header('Content-Type: text/plain');
-        header('Content-Disposition: attachment; filename="aa_content_report_' . $job_id . '.txt"');
-        
-        echo "Amino Acid Content Analysis Report\n";
-        echo "=================================\n\n";
-        echo "Job ID: $job_id\n";
-        echo "Protein Family: " . $row['protein_family'] . "\n";
-        echo "Taxonomic Group: " . $row['taxonomic_group'] . "\n";
-        echo "Date: " . date('Y-m-d H:i:s') . "\n";
-        if ($is_subset) {
-            echo "Subset: First " . ($_GET['subset'] ?? '?') . " sequences\n";
-        }
-        echo "\n";
-        
-        // Get all sequence results for this analysis
-        $results_stmt = $pdo->prepare("SELECT * FROM content_results 
-                                      WHERE job_id = ? AND analysis_id = ?
-                                      ORDER BY sequence_id");
-        $results_stmt->execute([$job_id, $analysis['id']]);
-        $results = $results_stmt->fetchAll();
-        
-        if (!empty($results)) {
-            foreach ($results as $result) {
-                $counts = json_decode($result['amino_acid_counts'], true);
-                $percentages = json_decode($result['amino_acid_percentages'], true);
-                
-                echo "Sequence: " . $result['sequence_id'] . "\n";
-                echo "Length: " . $result['sequence_length'] . " amino acids\n";
-                echo "Amino Acid Composition:\n";
-                
-                foreach ($amino_acids as $aa) {
-                    $percentage = $percentages[$aa] ?? 0;
-                    $count = $counts[$aa] ?? 0;
-                    echo sprintf("  %s: %6.2f%% (%d/%d)\n", $aa, $percentage, $count, $result['sequence_length']);
-                }
-                
-                echo str_repeat("-", 60) . "\n\n";
-            }
-        } else {
-            echo "No amino acid content results were found for this job.\n";
+
+            echo str_repeat("-", 60) . "\n\n";
         }
         exit;
     }
-    
-    // Prepare data for visualization
-    $results_stmt = $pdo->prepare("SELECT sequence_id, amino_acid_percentages 
-                                  FROM content_results 
-                                  WHERE job_id = ? AND analysis_id = ?
-                                  ORDER BY sequence_id");
-    $results_stmt->execute([$job_id, $analysis['id']]);
-    $results = $results_stmt->fetchAll();
-    
-    $aa_data = [];
-    $sequence_ids = [];
-    foreach ($results as $result) {
-        $aa_data[$result['sequence_id']] = json_decode($result['amino_acid_percentages'], true);
-        $sequence_ids[] = $result['sequence_id'];
+
+    // Get sequences for analysis
+    $sql = "SELECT ncbi_id, sequence FROM sequences WHERE job_id = ?";
+    if ($subset) {
+        $sql .= " LIMIT ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$job_id, $subset]);
+    } else {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$job_id]);
     }
-    
+    $sequences = $stmt->fetchAll();
+
+    // Calculate amino acid percentages
+    $aa_data = [];
+    $amino_acids = str_split('ACDEFGHIKLMNPQRSTVWY');
+
+    foreach ($sequences as $seq) {
+        $sequence = strtoupper($seq['sequence']);
+        $total = strlen($sequence);
+        $counts = array_fill_keys($amino_acids, 0);
+
+        foreach (str_split($sequence) as $aa) {
+            if (isset($counts[$aa])) {
+                $counts[$aa]++;
+            }
+        }
+
+        $percentages = [];
+        foreach ($counts as $aa => $count) {
+            $percentages[$aa] = $total > 0 ? ($count / $total) * 100 : 0;
+        }
+
+        $aa_data[$seq['ncbi_id']] = $percentages;
+    }
+
     $aa_data_json = json_encode($aa_data);
-    
+
 } catch (PDOException $e) {
     die("Database error: " . $e->getMessage());
 }
-
-// Database schema needed:
-/*
-CREATE TABLE content_analyses (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    job_id VARCHAR(255) NOT NULL,
-    is_subset BOOLEAN NOT NULL,
-    sequences_analyzed INT NOT NULL,
-    analysis_data LONGTEXT,
-    created_at DATETIME NOT NULL,
-    FOREIGN KEY (job_id) REFERENCES searches(job_id)
-);
-
-CREATE TABLE content_results (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    analysis_id INT NOT NULL,
-    job_id VARCHAR(255) NOT NULL,
-    sequence_id VARCHAR(255) NOT NULL,
-    sequence_length INT NOT NULL,
-    amino_acid_counts JSON,
-    amino_acid_percentages JSON,
-    FOREIGN KEY (analysis_id) REFERENCES content_analyses(id),
-    FOREIGN KEY (job_id) REFERENCES searches(job_id)
-);
-*/
 ?>
 
 <!DOCTYPE html>
@@ -218,7 +135,7 @@ CREATE TABLE content_results (
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        #sequenceSelector { width: 100%; padding: 10px; margin: 20px 0; font-size: 16px; }
+        #sequenceSelector { width: 100%; padding: 10px; margin: 20px 0; }
         #aaChart { width: 100%; height: 600px; }
         .subset-info { background: #e8f5e9; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
         .download-btn {
@@ -236,59 +153,65 @@ CREATE TABLE content_results (
         .download-btn:hover {
             background: #219653;
         }
-        .analysis-info {
-            background: #f0f8ff;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+        .action-buttons {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .action-btn {
+            padding: 8px 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            display: inline-block;
+        }
+        .action-btn:hover { background: #45a049; }
+        .action-btn.secondary {
+            background: #2196F3;
+        }
+        .action-btn.secondary:hover {
+            background: #0b7dda;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Amino Acid Content Analysis: <?= htmlspecialchars($row['protein_family']) ?></h1>
-        
-        <div class="analysis-info">
-            <p><strong>Job ID:</strong> <?= htmlspecialchars($job_id) ?></p>
-            <p><strong>Taxonomic Group:</strong> <?= htmlspecialchars($row['taxonomic_group']) ?></p>
-            <p><strong>Analysis Date:</strong> <?= $analysis['created_at'] ?></p>
-            <p><strong>Sequences Analyzed:</strong> <?= $analysis['sequences_analyzed'] ?></p>
+        <div class="action-buttons">
+            <a href="results.php?job_id=<?= $job_id ?>" class="action-btn secondary">Back to Results</a>
+            <a href="content.php?job_id=<?= $job_id ?>&subset=<?= $subset ?>&generate_report=1" class="action-btn">Download TXT Report</a>
         </div>
 
-        <?php if ($is_subset): ?>
+        <h1>Amino Acid Content Analysis: <?= htmlspecialchars($job['search_term']) ?></h1>
+        <p><strong>Job ID:</strong> <?= htmlspecialchars($job_id) ?></p>
+        <p><strong>Taxonomic Group:</strong> <?= htmlspecialchars($job['taxon']) ?></p>
+
+        <?php if ($subset): ?>
             <div class="subset-info">
-                <strong>Using subset:</strong> First <?= htmlspecialchars($_GET['subset'] ?? '?') ?> sequences
+                <strong>Using subset:</strong> First <?= $subset ?> sequences
             </div>
         <?php endif; ?>
 
-        <?php if (!empty($sequence_ids)): ?>
-            <select id="sequenceSelector">
-                <?php foreach ($sequence_ids as $id): ?>
-                    <option value="<?= htmlspecialchars($id) ?>"><?= htmlspecialchars($id) ?></option>
-                <?php endforeach; ?>
-            </select>
+        <select id="sequenceSelector">
+            <?php foreach (array_keys($aa_data) as $id): ?>
+                <option value="<?= htmlspecialchars($id) ?>"><?= htmlspecialchars($id) ?></option>
+            <?php endforeach; ?>
+        </select>
 
-            <div id="aaChart"></div>
-
-            <a href="?job_id=<?= $job_id ?>&subset=<?= $is_subset ? $_GET['subset'] : '' ?>&generate_report=1" class="download-btn">
-                Generate TXT Report
-            </a>
-        <?php else: ?>
-            <div style="background: #fdecea; padding: 20px; border-radius: 5px;">
-                <p>No amino acid content results were found for this analysis.</p>
-            </div>
-        <?php endif; ?>
+        <div id="aaChart"></div>
     </div>
 
     <script>
         const aaData = <?= $aa_data_json ?>;
-        const aminoAcids = <?= json_encode($amino_acids) ?>;
 
         function updateChart(selectedId) {
-            const percentages = aaData[selectedId];
             const data = [{
-                x: aminoAcids,
-                y: aminoAcids.map(aa => percentages[aa]),
+                x: Object.keys(aaData[selectedId]),
+                y: Object.values(aaData[selectedId]),
                 type: 'bar',
                 marker: { color: '#007BFF' }
             }];
@@ -296,10 +219,7 @@ CREATE TABLE content_results (
             const layout = {
                 title: `Amino Acid Composition: ${selectedId}`,
                 xaxis: { title: 'Amino Acid' },
-                yaxis: { 
-                    title: 'Percentage (%)',
-                    range: [0, 100] // Fixed scale for comparison
-                },
+                yaxis: { title: 'Percentage (%)' },
                 hovermode: 'closest'
             };
 
@@ -307,15 +227,13 @@ CREATE TABLE content_results (
         }
 
         // Initial chart load
-        if (Object.keys(aaData).length > 0) {
-            const initialId = Object.keys(aaData)[0];
-            updateChart(initialId);
+        const initialId = Object.keys(aaData)[0];
+        updateChart(initialId);
 
-            // Update chart on selection change
-            document.getElementById('sequenceSelector').addEventListener('change', function(e) {
-                updateChart(e.target.value);
-            });
-        }
+        // Update chart on selection change
+        document.getElementById('sequenceSelector').addEventListener('change', function(e) {
+            updateChart(e.target.value);
+        });
     </script>
 </body>
 </html>
