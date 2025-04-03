@@ -50,10 +50,12 @@ try {
     if ($sequence_id) {
         // Download single sequence report
         $stmt = $pdo->prepare("
-            SELECT s.ncbi_id, mr.report_text 
+            SELECT s.ncbi_id, mr.report_text
             FROM motif_reports mr
-            JOIN sequences s ON mr.sequence_id = s.sequence_id
+            JOIN motif_results mres ON mr.motif_id = mres.motif_id
+            JOIN sequences s ON mres.sequence_id = s.sequence_id
             WHERE mr.motif_id = ? AND s.sequence_id = ?
+            GROUP BY s.ncbi_id, mr.report_text
         ");
         $stmt->execute([$motif_job['motif_id'], $sequence_id]);
         $report = $stmt->fetch();
@@ -69,20 +71,19 @@ try {
     } else {
         // Download all motif results for the job
         $stmt = $pdo->prepare("
-            SELECT s.ncbi_id, mr.motif_name, mr.start_pos, mr.end_pos
-            FROM motif_results mr
-            JOIN sequences s ON mr.sequence_id = s.sequence_id
-            WHERE mr.motif_id = ?
-            ORDER BY s.ncbi_id, mr.start_pos
+            SELECT s.ncbi_id, mres.motif_name, mres.start_pos, mres.end_pos
+            FROM motif_results mres
+            JOIN sequences s ON mres.sequence_id = s.sequence_id
+            WHERE mres.motif_id = ?
+            ORDER BY s.ncbi_id, mres.start_pos
         ");
         $stmt->execute([$motif_job['motif_id']]);
         $results = $stmt->fetchAll();
 
         // Get all reports
         $stmt = $pdo->prepare("
-            SELECT s.ncbi_id, mr.report_text 
+            SELECT mr.report_text
             FROM motif_reports mr
-            JOIN sequences s ON mr.sequence_id = s.sequence_id
             WHERE mr.motif_id = ?
         ");
         $stmt->execute([$motif_job['motif_id']]);
@@ -93,20 +94,19 @@ try {
         $content .= "Search Term: " . $job['search_term'] . "\n";
         $content .= "Taxonomic Group: " . $job['taxon'] . "\n";
         $content .= "Generated on: " . date('Y-m-d H:i:s') . "\n\n";
-        
+
         $content .= "=== Summary of All Motifs ===\n";
         foreach ($results as $result) {
-            $content .= sprintf("%-15s %-20s %5d - %-5d\n", 
-                $result['ncbi_id'], 
-                $result['motif_name'], 
-                $result['start_pos'], 
+            $content .= sprintf("%-15s %-20s %5d - %-5d\n",
+                $result['ncbi_id'],
+                $result['motif_name'],
+                $result['start_pos'],
                 $result['end_pos']);
         }
-        
+
         $content .= "\n\n=== Detailed Reports ===\n";
         foreach ($reports as $report) {
-            $content .= "\n\n=== Sequence: {$report['ncbi_id']} ===\n";
-            $content .= $report['report_text'];
+            $content .= "\n\n" . $report['report_text'];
         }
     }
 
