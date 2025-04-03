@@ -1,6 +1,6 @@
-/* General Styles (shared with home.css) */
+/* General Styles */
 :root {
-    /* Color Variables */
+    /* Light Mode Colors */
     --primary-light: #667292;
     --secondary-light: #8d9db6;
     --accent-light: #bccad6;
@@ -8,6 +8,10 @@
     --dark-light: #2a3440;
     --text-light: #222222;
     --background-light: #f5f7fa;
+    --glass-light: rgba(255, 255, 255, 0.3);
+    --card-light: rgba(255, 255, 255, 0.6);
+
+    /* Dark Mode Colors */
     --primary-dark: #8d9db6;
     --secondary-dark: #667292;
     --accent-dark: #4a5a7a;
@@ -15,8 +19,9 @@
     --dark-dark: #1a222e;
     --text-dark: #e1e8f0;
     --background-dark: #121a24;
-    --glass-light: rgba(255, 255, 255, 0.1);
-    --glass-dark: rgba(26, 34, 46, 0.3);
+    --glass-dark: rgba(26, 34, 46, 0.6);
+    --card-dark: rgba(26, 34, 46, 0.8);
+
     /* Typography */
     --text-xs: 0.8rem;
     --text-sm: 1rem;
@@ -24,7 +29,21 @@
     --text-lg: 1.563rem;
     --text-xl: 1.953rem;
     --text-xxl: 2.441rem;
-    /* Current Mode */
+
+    /* Current Mode Variables - Default to Light */
+    --primary: var(--primary-light);
+    --secondary: var(--secondary-light);
+    --accent: var(--accent-light);
+    --light: var(--light-light);
+    --dark: var(--dark-light);
+    --text: var(--text-light);
+    --background: var(--background-light);
+    --glass: var(--glass-light);
+    --card: var(--card-light);
+}
+
+/* Dark Mode */
+body.dark-mode {
     --primary: var(--primary-dark);
     --secondary: var(--secondary-dark);
     --accent: var(--accent-dark);
@@ -33,6 +52,7 @@
     --text: var(--text-dark);
     --background: var(--background-dark);
     --glass: var(--glass-dark);
+    --card: var(--card-dark);
 }
 
 * {
@@ -48,6 +68,17 @@ body {
     line-height: 1.6;
     min-height: 100vh;
     transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Animated Background */
+#particles-js {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    background: var(--background);
 }
 
 /* Glass Effect */
@@ -74,7 +105,7 @@ body {
     display: flex;
     align-items: center;
     padding: 0 0.3rem;
-    transition: background 0.3s ease;
+    transition: all 0.3s ease;
 }
 
 .toggle-icon {
@@ -130,6 +161,7 @@ body:not(.dark-mode) .toggle-icon {
     transform: scale(1.05);
 }
 
+/* Navigation Link Colors */
 body.dark-mode .logo-tab span,
 body.dark-mode .nav-link {
     color: #add8e6;
@@ -180,8 +212,16 @@ body:not(.dark-mode) .nav-link {
 
 .nav-link:hover,
 .nav-link.active {
-    opacity: 0.9;
     background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Main Content */
+.main-content {
+    position: relative;
+    padding: 2.5rem;
+    max-width: 1400px;
+    margin: 2rem auto;
+    z-index: 1;
 }
 
 /* Footer */
@@ -225,6 +265,48 @@ body:not(.dark-mode) .nav-link {
 
 .github-link i {
     font-size: 1.2rem;
+}
+
+/* Form Elements */
+input, textarea, select {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--accent);
+    color: var(--text);
+    padding: 0.8rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    transition: border-color 0.3s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--secondary);
+}
+
+/* Buttons */
+button, .action-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+button:hover, .action-btn:hover {
+    background: var(--secondary);
+}
+
+/* Cards */
+.sequence-card {
+    background: var(--card);
+    border-radius: 0.8rem;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
 }
 
 /* Responsive Design */

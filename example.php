@@ -1,10 +1,19 @@
+this is example.php
 <?php
-session_start();
+// Set infinite session cookie at the very top
+setcookie('protein_search_session', 'permanent_session', [
+    'expires' => time() + (10 * 365 * 24 * 60 * 60), // 10 years (practically infinite)
+    'path' => '/',
+    'domain' => $_SERVER['HTTP_HOST'],
+    'secure' => true,
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 
-if (!isset($_COOKIE['protein_search_session'])) {
-    header("Location: home.php");
-    exit();
-}
+// Configure session to last essentially forever
+ini_set('session.gc_maxlifetime', 60*60*24*365); // 1 year
+session_set_cookie_params(60*60*24*365); // 1 year
+session_start();
 
 $job_id = 90; // Fixed job ID for this example page
 
@@ -16,14 +25,29 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
     ]);
 
-    // Verify user owns this job
-    $stmt = $pdo->prepare("SELECT j.* FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ? AND u.session_id = ?");
-    $stmt->execute([$job_id, $_COOKIE['protein_search_session']]);
+    // Bypass normal session verification for this special case
+    $stmt = $pdo->prepare("SELECT j.* FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ? AND u.session_id = 'permanent_session'");
+    $stmt->execute([$job_id]);
     $job = $stmt->fetch();
 
     if (!$job) {
-        header("Location: home.php");
-        exit();
+        // Create the permanent session if it doesn't exist
+        $pdo->beginTransaction();
+
+        // Create permanent user if not exists
+        $stmt = $pdo->prepare("INSERT IGNORE INTO users (session_id, created_at) VALUES ('permanent_session', NOW())");
+        $stmt->execute();
+
+        // Assign job to permanent user
+        $stmt = $pdo->prepare("UPDATE jobs SET user_id = (SELECT user_id FROM users WHERE session_id = 'permanent_session') WHERE job_id = ?");
+        $stmt->execute([$job_id]);
+
+        $pdo->commit();
+
+        // Refetch the job
+        $stmt = $pdo->prepare("SELECT j.* FROM jobs j JOIN users u ON j.user_id = u.user_id WHERE j.job_id = ?");
+        $stmt->execute([$job_id]);
+        $job = $stmt->fetch();
     }
 
     // Get basic job info
@@ -37,6 +61,7 @@ try {
     $sequences = $stmt->fetchAll();
     $sequence_count = count($sequences);
 
+    // [Rest of your existing code remains exactly the same...]
     // Get conservation analysis
     $stmt = $pdo->prepare("SELECT * FROM conservation_jobs WHERE job_id = ? ORDER BY created_at DESC LIMIT 1");
     $stmt->execute([$job_id]);
@@ -45,7 +70,7 @@ try {
     $conservation_results = [];
     $conservation_report = [];
     $conservation_alignments = [];
-    
+
     if ($conservation_job) {
         $stmt = $pdo->prepare("SELECT position, entropy, plotcon_score FROM conservation_results WHERE conservation_id = ? ORDER BY position");
         $stmt->execute([$conservation_job['conservation_id']]);
@@ -67,12 +92,12 @@ try {
 
     $motif_results = [];
     $motif_reports = [];
-    
+
     if ($motif_job) {
         $stmt = $pdo->prepare("
-            SELECT mr.*, s.ncbi_id as sequence 
-            FROM motif_results mr 
-            JOIN sequences s ON mr.sequence_id = s.sequence_id 
+            SELECT mr.*, s.ncbi_id as sequence
+            FROM motif_results mr
+            JOIN sequences s ON mr.sequence_id = s.sequence_id
             WHERE mr.motif_id = ?
             ORDER BY mr.sequence_id, mr.start_pos
         ");
@@ -84,11 +109,12 @@ try {
         $motif_reports = $stmt->fetchAll();
     }
 
+    // [Continue with the rest of your existing code...]
     // Prepare data for visualization
     $entropy_data = [];
     $plotcon_data = [];
     $aa_data = [];
-    
+
     if ($conservation_results) {
         $entropy_data = [
             'data' => [[
@@ -132,7 +158,7 @@ try {
     // Prepare amino acid content data
     $amino_acids = str_split('ACDEFGHIKLMNPQRSTVWY');
     $aa_data = [];
-    
+
     foreach ($sequences as $seq) {
         $sequence = strtoupper($seq['sequence']);
         $total = strlen($sequence);
@@ -162,7 +188,7 @@ try {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Example Analysis Report - Job #<?= $job_id ?></title>
+    <title>Permanent Analysis Report - Job #<?= $job_id ?></title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; color: #333; }
@@ -204,10 +230,21 @@ try {
             margin-bottom: 20px;
         }
         .insights { background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .permanent-notice {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="permanent-notice">
+            <h3>Permanent Access Enabled</h3>
+            <p>This page and job #<?= $job_id ?> are now permanently accessible from any browser.</p>
+        </div>
+
         <div class="nav">
             <a href="home.php" class="btn">New Search</a>
             <a href="past.php" class="btn">Past Searches</a>
@@ -215,12 +252,13 @@ try {
         </div>
 
         <div class="header">
-            <h1>Comprehensive Analysis Report</h1>
-            <p><strong>Job ID:</strong> <?= $job_id ?> | <strong>Search Term:</strong> <?= htmlspecialchars($job_info['search_term']) ?> | 
+            <h1>Permanent Analysis Report</h1>
+            <p><strong>Job ID:</strong> <?= $job_id ?> | <strong>Search Term:</strong> <?= htmlspecialchars($job_info['search_term']) ?> |
                <strong>Taxon:</strong> <?= htmlspecialchars($job_info['taxon']) ?></p>
             <p><strong>Sequences:</strong> <?= $sequence_count ?> | <strong>Date:</strong> <?= date('M j, Y g:i a', strtotime($job_info['created_at'])) ?></p>
         </div>
 
+        <!-- [Rest of your HTML remains exactly the same...] -->
         <div class="summary-grid">
             <div class="summary-card">
                 <h3>Conservation Analysis</h3>
@@ -257,9 +295,9 @@ try {
         <?php if ($conservation_job): ?>
         <div class="section">
             <h2 class="section-title">Conservation Analysis</h2>
-            
+
             <div class="plot-container" id="entropyPlot"></div>
-            
+
             <?php if ($plotcon_data): ?>
                 <div class="plot-container" id="plotconPlot"></div>
             <?php endif; ?>
@@ -286,23 +324,23 @@ try {
         <?php if ($motif_job): ?>
         <div class="section">
             <h2 class="section-title">Motif Analysis</h2>
-            
+
             <p><strong>Total Motifs Found:</strong> <?= count($motif_results) ?></p>
             <p><strong>Unique Motif Types:</strong> <?= count(array_unique(array_column($motif_results, 'motif_name'))) ?></p>
-            
+
             <h3>Motifs by Sequence</h3>
-            <?php 
+            <?php
             $motifs_by_sequence = [];
             foreach ($motif_results as $motif) {
                 $motifs_by_sequence[$motif['sequence']][] = $motif;
             }
             ?>
-            
+
             <?php foreach ($motifs_by_sequence as $seq_id => $seq_motifs): ?>
                 <div style="margin-bottom: 20px;">
                     <h4><?= htmlspecialchars($seq_id) ?> (<?= count($seq_motifs) ?> motifs)</h4>
-                    
-                    <?php 
+
+                    <?php
                     $sequence = '';
                     foreach ($sequences as $seq) {
                         if ($seq['ncbi_id'] == $seq_id) {
@@ -311,12 +349,12 @@ try {
                         }
                     }
                     ?>
-                    
+
                     <?php foreach ($seq_motifs as $motif): ?>
                         <div class="motif">
-                            <p><strong><?= htmlspecialchars($motif['motif_name']) ?></strong> 
+                            <p><strong><?= htmlspecialchars($motif['motif_name']) ?></strong>
                             (Positions: <?= $motif['start_pos'] ?>-<?= $motif['end_pos'] ?>)</p>
-                            
+
                             <?php
                             $start = max(0, $motif['start_pos'] - 10);
                             $end = min(strlen($sequence), $motif['end_pos'] + 10);
@@ -324,7 +362,7 @@ try {
                             $highlight_start = $motif['start_pos'] - $start - 1;
                             $highlight_length = $motif['end_pos'] - $motif['start_pos'] + 1;
                             ?>
-                            
+
                             <div style="font-family: monospace; margin: 5px 0;">
                                 <?= substr($segment, 0, $highlight_start) ?>
                                 <span class="highlight"><?= substr($segment, $highlight_start, $highlight_length) ?></span>
@@ -343,13 +381,13 @@ try {
 
         <div class="section">
             <h2 class="section-title">Amino Acid Content Analysis</h2>
-            
+
             <select id="sequenceSelector" style="width: 100%; padding: 10px; margin: 20px 0;">
                 <?php foreach (array_keys($aa_data) as $id): ?>
                     <option value="<?= htmlspecialchars($id) ?>"><?= htmlspecialchars($id) ?></option>
                 <?php endforeach; ?>
             </select>
-            
+
             <div class="plot-container" id="aaChart"></div>
         </div>
     </div>
