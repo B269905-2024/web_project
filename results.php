@@ -78,12 +78,32 @@ try {
         .action-btn.analysis:hover {
             background: #7b1fa2;
         }
+        .nav-links {
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+            margin-right: 15px;
+            text-decoration: none;
+            color: #0366d6;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        .sequence {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
-    <div>
+    <div class="nav-links">
         <a href="home.php">New Search</a>
         <a href="past.php">Past Searches</a>
+        <a href="example.php">Example Analysis</a>
+        <a href="about.php">About</a>
+        <a href="help.php">Help</a>
     </div>
 
     <div>
@@ -98,12 +118,14 @@ try {
     <div class="action-buttons">
         <a href="results.php?job_id=<?php echo $job_id; ?>&download=1" class="action-btn">Download FASTA</a>
         <a href="conservation.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Run Conservation Analysis</a>
+        <a href="motifs.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Run Motif Analysis</a>
+        <a href="content.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Amino Acid Content</a>
         <a href="past.php" class="action-btn secondary">Back to Past Searches</a>
     </div>
 
     <?php if (!empty($sequences)): ?>
         <?php foreach ($sequences as $seq): ?>
-            <div>
+            <div class="sequence">
                 <div>><?php echo htmlspecialchars($seq['ncbi_id']); ?> <?php echo htmlspecialchars($seq['description']); ?></div>
                 <div>Length: <?php echo strlen($seq['sequence']); ?> amino acids</div>
                 <div><?php echo chunk_split($seq['sequence'], 80, "\n"); ?></div>
@@ -112,10 +134,10 @@ try {
 
         <div class="action-buttons">
             <a href="results.php?job_id=<?php echo $job_id; ?>&download=1" class="action-btn">Download FASTA</a>
-	    <a href="conservation.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Run Conservation Analysis</a>
- 	    <a href="motifs.php?job_id=<?php echo $job_id; ?>" class="action-btn motif">Run Motif Analysis</a>
-	    <a href="content.php?job_id=<?php echo $job_id; ?>" class="action-btn">Amino Acid Content</a>
-	    <a href="past.php" class="action-btn secondary">Back to Past Searches</a>
+            <a href="conservation.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Run Conservation Analysis</a>
+            <a href="motifs.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Run Motif Analysis</a>
+            <a href="content.php?job_id=<?php echo $job_id; ?>" class="action-btn analysis">Amino Acid Content</a>
+            <a href="past.php" class="action-btn secondary">Back to Past Searches</a>
         </div>
     <?php else: ?>
         <p>No sequences were found for this search.</p>
