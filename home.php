@@ -221,7 +221,6 @@ try {
         // Cookie Consent Functionality
         const cookieConsent = document.getElementById('cookieConsent');
         const acceptCookies = document.getElementById('acceptCookies');
-        const rejectCookies = document.getElementById('rejectCookies');
         const body = document.body;
 
         // Check if cookies are accepted
@@ -236,11 +235,6 @@ try {
             hideCookieConsent();
         });
 
-        // Handle cookie rejection
-        rejectCookies.addEventListener('click', function() {
-            localStorage.setItem('cookiesRejected', 'true');
-            hideCookieConsent();
-        });
 
         function hideCookieConsent() {
             document.getElementById('cookieConsent').style.display = 'none';
